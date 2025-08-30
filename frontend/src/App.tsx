@@ -85,7 +85,7 @@ function App() {
 
     const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
     const sortedTasks = [...currentTasksWithoutBreaks, newTask].sort((a, b) => {
-      const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 };
+      const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 }; // Added break to priorityOrder
       return priorityOrder[a.priority] - priorityOrder[b.priority];
     });
 
@@ -113,7 +113,7 @@ function App() {
       );
 
       const sortedTasks = updatedTasks.filter(t => t.priority !== 'break').sort((a, b) => {
-        const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 };
+        const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 }; // Added break to priorityOrder
         return priorityOrder[a.priority] - priorityOrder[b.priority];
       });
 
@@ -129,10 +129,9 @@ function App() {
       const oldIndex = tasks.findIndex((task) => task.id === active.id);
       const newIndex = tasks.findIndex((task) => task.id === over.id);
 
-      const newOrder = arrayMove(tasks, oldIndex, newIndex);
-      const newOrderWithoutBreaks = newOrder.filter(task => task.priority !== 'break');
-
-      setTasks(recalculateSchedule(newOrderWithoutBreaks));
+      setTasks((tasks) => {
+        return arrayMove(tasks, oldIndex, newIndex);
+      });
     }
   };
 
@@ -185,7 +184,7 @@ function App() {
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
               <div>
-                {scheduledTasks.map((task) => (
+                {tasks.map((task) => (
                   <SortableTaskItem key={task.id} task={task} handleOpenEditDialog={handleOpenEditDialog} />
                 ))}
               </div>
