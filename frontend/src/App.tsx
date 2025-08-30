@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTaskItem } from './SortableTaskItem';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Sparkles, Edit, XCircle, Coffee, Gamepad2 } from 'lucide-react';
 
 // A simple interface to define the shape of a task object
 export interface Task {
@@ -20,6 +20,18 @@ const formatTime = (date: Date) => {
   return date.toLocaleTimeString('en-GB', { hour: 'numeric', minute: 'numeric', hour12: true });
 };
 
+// Function to automatically assign emoji based on task text
+const getEmojiForTask = (taskText: string): string => {
+  const lowerCaseText = taskText.toLowerCase();
+  if (lowerCaseText.includes('read') || lowerCaseText.includes('book') || lowerCaseText.includes('homework') || lowerCaseText.includes('study')) return '📚';
+  if (lowerCaseText.includes('clean') || lowerCaseText.includes('tidy') || lowerCaseText.includes('room')) return '🧹';
+  if (lowerCaseText.includes('math') || lowerCaseText.includes('numbers')) return '🔢';
+  if (lowerCaseText.includes('draw') || lowerCaseText.includes('art') || lowerCaseText.includes('paint')) return '🎨';
+  if (lowerCaseText.includes('play') || lowerCaseText.includes('game') || lowerCaseText.includes('outside')) return '🎮';
+  if (lowerCaseText.includes('walk') || lowerCaseText.includes('dog')) return '🐶';
+  return '⭐'; // Default emoji
+};
+
 function App() {
   // State to hold the list of tasks
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -27,8 +39,6 @@ function App() {
   const [newTaskText, setNewTaskText] = useState('');
   // State to hold the priority of the new task
   const [newTaskPriority, setNewTaskPriority] = useState<'high' | 'medium' | 'low'>('medium');
-  // State to hold the emoji for the new task
-  const [newTaskEmoji, setNewTaskEmoji] = useState('');
   // State for the edit dialog
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -80,19 +90,18 @@ function App() {
       text: newTaskText,
       completed: false,
       priority: newTaskPriority,
-      emoji: newTaskEmoji,
+      emoji: getEmojiForTask(newTaskText), // Auto-assign emoji
     };
 
     const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
     const sortedTasks = [...currentTasksWithoutBreaks, newTask].sort((a, b) => {
-      const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 }; // Added break to priorityOrder
+      const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 };
       return priorityOrder[a.priority] - priorityOrder[b.priority];
     });
 
     setTasks(recalculateSchedule(sortedTasks));
     setNewTaskText(''); // Clear the input field
     setNewTaskPriority('medium'); // Reset the priority dropdown
-    setNewTaskEmoji(''); // Clear the emoji input
   };
 
   const handleOpenEditDialog = (task: Task) => {
@@ -113,7 +122,7 @@ function App() {
       );
 
       const sortedTasks = updatedTasks.filter(t => t.priority !== 'break').sort((a, b) => {
-        const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 }; // Added break to priorityOrder
+        const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 };
         return priorityOrder[a.priority] - priorityOrder[b.priority];
       });
 
@@ -129,9 +138,10 @@ function App() {
       const oldIndex = tasks.findIndex((task) => task.id === active.id);
       const newIndex = tasks.findIndex((task) => task.id === over.id);
 
-      setTasks((tasks) => {
-        return arrayMove(tasks, oldIndex, newIndex);
-      });
+      const newOrder = arrayMove(tasks, oldIndex, newIndex);
+      const newOrderWithoutBreaks = newOrder.filter(task => task.priority !== 'break');
+
+      setTasks(recalculateSchedule(newOrderWithoutBreaks));
     }
   };
 
@@ -151,13 +161,6 @@ function App() {
               placeholder="What do you need to do?"
               value={newTaskText}
               onChange={(e) => setNewTaskText(e.target.value)}
-              className="p-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-500 transition-all duration-300"
-            />
-            <input
-              type="text"
-              placeholder="Choose an Emoji ✏️"
-              value={newTaskEmoji}
-              onChange={(e) => setNewTaskEmoji(e.target.value)}
               className="p-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-500 transition-all duration-300"
             />
             <select

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Edit } from 'lucide-react';
+import { Edit, Coffee, Gamepad2 } from 'lucide-react';
 import { Task } from './App';
 
 interface SortableTaskItemProps {
@@ -41,7 +41,12 @@ export function SortableTaskItem({ task, handleOpenEditDialog }: SortableTaskIte
     <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="mb-2">
       <div className={`p-4 rounded-lg shadow-sm flex items-center justify-between border-l-4 ${getPriorityClasses(task.priority)}`}>
         <div className="flex items-center space-x-3">
-          {task.emoji && task.priority !== 'break' && <span className="text-3xl">{task.emoji}</span>}
+          {task.priority !== 'break' && task.emoji && <span className="text-3xl">{task.emoji}</span>}
+          {task.priority === 'break' && (
+            <span className="text-3xl">
+              {Math.random() > 0.5 ? <Coffee size={32} /> : <Gamepad2 size={32} />}
+            </span>
+          )}
           <p className="text-lg font-medium">{task.text}</p>
         </div>
         <div className="flex items-center space-x-2">
