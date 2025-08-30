@@ -117,7 +117,7 @@ function App() {
 
     const currentTasks = tasks.filter((task) => task.priority !== 'break');
     const sortedTasks = [...currentTasks, newTask].sort((a, b) => {
-      const priorityOrder = { high: 1, medium: 2, low: 3 };
+      const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 }; // Added break to priorityOrder
       return priorityOrder[a.priority] - priorityOrder[b.priority];
     });
 
@@ -152,7 +152,7 @@ function App() {
       );
 
       const sortedTasks = updatedTasks.filter(t => t.priority !== 'break').sort((a, b) => {
-        const priorityOrder = { high: 1, medium: 2, low: 3 };
+        const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 }; // Added break to priorityOrder
         return priorityOrder[a.priority] - priorityOrder[b.priority];
       });
 
