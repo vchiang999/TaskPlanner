@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTaskItem } from './SortableTaskItem';
-import { PlusCircle, Sparkles, Edit, XCircle, Coffee, Gamepad2 } from 'lucide-react';
+import { PlusCircle } from 'lucide-react';
 
 // A simple interface to define the shape of a task object
 export interface Task {
@@ -95,7 +95,7 @@ function App() {
 
     const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
     const sortedTasks = [...currentTasksWithoutBreaks, newTask].sort((a, b) => {
-      const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 };
+      const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 }; // Added break to priorityOrder
       return priorityOrder[a.priority] - priorityOrder[b.priority];
     });
 
@@ -122,7 +122,7 @@ function App() {
       );
 
       const sortedTasks = updatedTasks.filter(t => t.priority !== 'break').sort((a, b) => {
-        const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 };
+        const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 }; // Added break to priorityOrder
         return priorityOrder[a.priority] - priorityOrder[b.priority];
       });
 
@@ -138,10 +138,9 @@ function App() {
       const oldIndex = tasks.findIndex((task) => task.id === active.id);
       const newIndex = tasks.findIndex((task) => task.id === over.id);
 
-      const newOrder = arrayMove(tasks, oldIndex, newIndex);
-      const newOrderWithoutBreaks = newOrder.filter(task => task.priority !== 'break');
-
-      setTasks(recalculateSchedule(newOrderWithoutBreaks));
+      setTasks((tasks) => {
+        return arrayMove(tasks, oldIndex, newIndex);
+      });
     }
   };
 
