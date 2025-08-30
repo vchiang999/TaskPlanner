@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Edit, Coffee, Gamepad2 } from 'lucide-react';
@@ -7,9 +7,10 @@ import { Task } from './App';
 interface SortableTaskItemProps {
   task: Task;
   handleOpenEditDialog: (task: Task) => void;
+  index: number; // Add index prop
 }
 
-export function SortableTaskItem({ task, handleOpenEditDialog }: SortableTaskItemProps) {
+export function SortableTaskItem({ task, handleOpenEditDialog, index }: SortableTaskItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task.id, disabled: task.priority === 'break' });
 
   const style = {
@@ -37,8 +38,25 @@ export function SortableTaskItem({ task, handleOpenEditDialog }: SortableTaskIte
     }
   };
 
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    // Trigger animation after a short delay based on index
+    const timer = setTimeout(() => {
+      setIsVisible(true);
+    }, index * 100); // Stagger animation by 100ms per item
+
+    return () => clearTimeout(timer);
+  }, [index]);
+
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="mb-2">
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={`mb-2 transform transition-all duration-500 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+    >
       <div className={`p-4 rounded-lg shadow-sm flex items-center justify-between border-l-4 ${getPriorityClasses(task.priority)}`}>
         <div className="flex items-center space-x-3">
           {task.priority !== 'break' && task.emoji && <span className="text-3xl">{task.emoji}</span>}

@@ -186,8 +186,8 @@ function App() {
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
               <div>
-                {tasks.map((task) => (
-                  <SortableTaskItem key={task.id} task={task} handleOpenEditDialog={handleOpenEditDialog} />
+                {tasks.map((task, index) => (
+                  <SortableTaskItem key={task.id} task={task} handleOpenEditDialog={handleOpenEditDialog} index={index} />
                 ))}
               </div>
             </SortableContext>
