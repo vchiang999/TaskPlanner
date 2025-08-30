@@ -8,7 +8,12 @@ import {
   Container,
   createTheme,
   CssBaseline,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
+  IconButton,
   InputLabel,
   MenuItem,
   Select,
@@ -17,13 +22,17 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material';
+import EditIcon from '@mui/icons-material/Edit';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableTaskItem } from './SortableTaskItem';
 
 // A simple interface to define the shape of a task object
-interface Task {
+export interface Task {
   id: number;
   text: string;
   completed: boolean;
-  priority: 'high' | 'medium' | 'low';
+  priority: 'high' | 'medium' | 'low' | 'break';
   startTime: string;
   endTime: string;
 }
@@ -66,6 +75,46 @@ function App() {
   const [newTaskText, setNewTaskText] = useState('');
   // State to hold the priority of the new task
   const [newTaskPriority, setNewTaskPriority] = useState<'high' | 'medium' | 'low'>('medium');
+  // State for the edit dialog
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [selectedTaskPriority, setSelectedTaskPriority] = useState<'high' | 'medium' | 'low'>('medium');
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const updateTasks = (updatedTasks: Omit<Task, 'startTime' | 'endTime'>[]) => {
+    const tasksWithBreaks: Omit<Task, 'startTime' | 'endTime'>[] = [];
+    updatedTasks.forEach((task, index) => {
+      tasksWithBreaks.push(task);
+      if (index < updatedTasks.length - 1) {
+        tasksWithBreaks.push({ id: Date.now() + index, text: 'Break Time', completed: false, priority: 'break' });
+      }
+    });
+
+    let currentTime = new Date();
+    currentTime.setHours(9, 0, 0, 0); // Start at 9:00 AM
+
+    const finalTasks = tasksWithBreaks.map((task) => {
+      const taskDuration = task.priority === 'break' ? 15 : 30;
+      const startTime = new Date(currentTime);
+      const endTime = new Date(currentTime.getTime() + taskDuration * 60000);
+
+      currentTime = endTime;
+
+      return {
+        ...task,
+        startTime: formatTime(startTime),
+        endTime: formatTime(endTime),
+      };
+    });
+
+    setTasks(finalTasks as Task[]);
+  };
 
   // Handle form submission to add a new task
   const handleAddTask = (e: React.FormEvent) => {
@@ -79,25 +128,54 @@ function App() {
       priority: newTaskPriority,
     };
 
-    const updatedTasks = [...tasks, newTask]
-      .sort((a, b) => {
-        const priorityOrder = { high: 1, medium: 2, low: 3 };
-        return priorityOrder[a.priority] - priorityOrder[b.priority];
-      })
-      .map((task, index) => {
-        const startTime = new Date();
-        startTime.setHours(9, 0, 0, 0); // Start at 9:00 AM
-        startTime.setMinutes(startTime.getMinutes() + index * 30); // Each task takes 30 minutes
+    const currentTasks = tasks.filter((task) => task.priority !== 'break');
+    const updatedTasks = [...currentTasks, newTask].sort((a, b) => {
+      const priorityOrder = { high: 1, medium: 2, low: 3 };
+      return priorityOrder[a.priority] - priorityOrder[b.priority];
+    });
 
-        const endTime = new Date(startTime.getTime());
-        endTime.setMinutes(endTime.getMinutes() + 30);
-
-        return { ...task, startTime: formatTime(startTime), endTime: formatTime(endTime) };
-      });
-
-    setTasks(updatedTasks as Task[]); // Add the new task and sort the list
+    updateTasks(updatedTasks);
     setNewTaskText(''); // Clear the input field
     setNewTaskPriority('medium'); // Reset the priority dropdown
+  };
+
+  const handleOpenEditDialog = (task: Task) => {
+    setSelectedTask(task);
+    setSelectedTaskPriority(task.priority as 'high' | 'medium' | 'low');
+    setEditDialogOpen(true);
+  };
+
+  const handleCloseEditDialog = () => {
+    setEditDialogOpen(false);
+    setSelectedTask(null);
+  };
+
+  const handleUpdateTaskPriority = () => {
+    if (selectedTask) {
+      const updatedTasks = tasks.filter(t => t.priority !== 'break').map((task) =>
+        task.id === selectedTask.id ? { ...task, priority: selectedTaskPriority } : task
+      ).sort((a, b) => {
+        const priorityOrder = { high: 1, medium: 2, low: 3 };
+        return priorityOrder[a.priority] - priorityOrder[b.priority];
+      });
+
+      updateTasks(updatedTasks);
+      handleCloseEditDialog();
+    }
+  };
+
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+
+    if (active.id !== over.id) {
+      const oldIndex = tasks.findIndex((task) => task.id === active.id);
+      const newIndex = tasks.findIndex((task) => task.id === over.id);
+
+      const newTasks = arrayMove(tasks, oldIndex, newIndex);
+      const newTasksWithoutBreaks = newTasks.filter(task => task.priority !== 'break');
+
+      updateTasks(newTasksWithoutBreaks);
+    }
   };
 
   return (
@@ -144,18 +222,38 @@ function App() {
         <Typography variant="h2" component="h2" gutterBottom>
           My Timetable
         </Typography>
-        <Box>
-          {tasks.map((task) => (
-            <Card key={task.id} sx={{ mb: 2, backgroundColor: task.priority === 'high' ? '#ffcdd2' : task.priority === 'medium' ? '#fff9c4' : '#c8e6c9' }}>
-              <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="body1">{task.text}</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {task.startTime} - {task.endTime}
-                </Typography>
-              </CardContent>
-            </Card>
-          ))}
-        </Box>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+            <Box>
+              {tasks.map((task) => (
+                <SortableTaskItem key={task.id} task={task} handleOpenEditDialog={handleOpenEditDialog} />
+              ))}
+            </Box>
+          </SortableContext>
+        </DndContext>
+        <Dialog open={editDialogOpen} onClose={handleCloseEditDialog}>
+          <DialogTitle>Edit Task Priority</DialogTitle>
+          <DialogContent>
+            <FormControl fullWidth sx={{ mt: 2 }}>
+              <InputLabel id="edit-priority-select-label">Priority</InputLabel>
+              <Select
+                labelId="edit-priority-select-label"
+                id="edit-priority-select"
+                value={selectedTaskPriority}
+                label="Priority"
+                onChange={(e) => setSelectedTaskPriority(e.target.value as 'high' | 'medium' | 'low')}
+              >
+                <MenuItem value={'high'}>High</MenuItem>
+                <MenuItem value={'medium'}>Medium</MenuItem>
+                <MenuItem value={'low'}>Low</MenuItem>
+              </Select>
+            </FormControl>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseEditDialog}>Cancel</Button>
+            <Button onClick={handleUpdateTaskPriority}>Save</Button>
+          </DialogActions>
+        </Dialog>
       </Container>
     </ThemeProvider>
   );
