@@ -1,8 +1,7 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Card, CardContent, IconButton, Typography, Box } from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
+import { Edit } from 'lucide-react';
 import { Task } from './App';
 
 interface SortableTaskItemProps {
@@ -23,23 +22,39 @@ export function SortableTaskItem({ task, handleOpenEditDialog }: SortableTaskIte
     handleOpenEditDialog(task);
   };
 
+  const getPriorityClasses = (priority: Task['priority']) => {
+    switch (priority) {
+      case 'high':
+        return 'bg-yellow-200 border-yellow-500';
+      case 'medium':
+        return 'bg-teal-200 border-teal-500';
+      case 'low':
+        return 'bg-green-200 border-green-500';
+      case 'break':
+        return 'bg-pink-200 border-pink-500';
+      default:
+        return 'bg-gray-200 border-gray-500';
+    }
+  };
+
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <Card sx={{ mb: 2, backgroundColor: task.priority === 'high' ? '#ffcdd2' : task.priority === 'medium' ? '#fff9c4' : task.priority === 'low' ? '#c8e6c9' : '#e0e0e0' }}>
-        <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="body1">{task.text}</Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mr: 2 }}>
-              {task.startTime} - {task.endTime}
-            </Typography>
-            {task.priority !== 'break' && (
-              <IconButton onClick={handleEditClick}>
-                <EditIcon />
-              </IconButton>
-            )}
-          </Box>
-        </CardContent>
-      </Card>
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="mb-2">
+      <div className={`p-4 rounded-lg shadow-sm flex items-center justify-between border-l-4 ${getPriorityClasses(task.priority)}`}>
+        <div className="flex items-center space-x-3">
+          {task.emoji && task.priority !== 'break' && <span className="text-3xl">{task.emoji}</span>}
+          <p className="text-lg font-medium">{task.text}</p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <span className="text-sm text-slate-600">
+            {task.startTime} - {task.endTime}
+          </span>
+          {task.priority !== 'break' && (
+            <button onClick={handleEditClick} className="p-1 rounded-full hover:bg-white transition-all duration-300">
+              <Edit size={20} className="text-slate-600" />
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
