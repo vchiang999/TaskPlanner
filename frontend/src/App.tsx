@@ -3,8 +3,6 @@ import {
   AppBar,
   Box,
   Button,
-  Card,
-  CardContent,
   Container,
   createTheme,
   CssBaseline,
@@ -13,7 +11,6 @@ import {
   DialogContent,
   DialogTitle,
   FormControl,
-  IconButton,
   InputLabel,
   MenuItem,
   Select,
@@ -22,7 +19,6 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTaskItem } from './SortableTaskItem';
