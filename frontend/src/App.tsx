@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTaskItem } from './SortableTaskItem';
-import { PlusCircle, Sparkles, Edit, XCircle } from 'lucide-react';
+import { PlusCircle } from 'lucide-react';
 
 // A simple interface to define the shape of a task object
 export interface Task {
