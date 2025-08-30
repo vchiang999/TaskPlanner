@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTaskItem } from './SortableTaskItem';
-import { PlusCircle, Sparkles } from 'lucide-react';
+import { PlusCircle, Sparkles, Edit, XCircle } from 'lucide-react';
 
 // A simple interface to define the shape of a task object
 export interface Task {
@@ -193,30 +193,41 @@ function App() {
           </DndContext>
         </section>
 
-        <Dialog open={editDialogOpen} onClose={handleCloseEditDialog}>
-          <DialogTitle>Edit Task Priority</DialogTitle>
-          <DialogContent>
-            <FormControl fullWidth sx={{ mt: 2 }}>
-              <InputLabel id="edit-priority-select-label">Priority</InputLabel>
-              <Select
-                labelId="edit-priority-select-label"
-                id="edit-priority-select"
-                value={selectedTaskPriority}
-                label="Priority"
-                onChange={(e) => setSelectedTaskPriority(e.target.value as 'high' | 'medium' | 'low')}
-              >
-                <MenuItem value={'high'}>High</MenuItem>
-                <MenuItem value={'medium'}>Medium</MenuItem>
-                <MenuItem value={'low'}>Low</MenuItem>
-              </Select>
-            </FormControl>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseEditDialog}>Cancel</Button>
-            <Button onClick={handleUpdateTaskPriority}>Save</Button>
-          </DialogActions>
-        </Dialog>
-      </Container>
+        {editDialogOpen && selectedTask && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center z-50">
+            <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+              <h3 className="text-2xl font-semibold mb-4">Edit Task Priority</h3>
+              <div className="mb-4">
+                <label htmlFor="edit-priority-select" className="block text-lg font-medium text-slate-700 mb-2">Priority</label>
+                <select
+                  id="edit-priority-select"
+                  value={selectedTaskPriority}
+                  onChange={(e) => setSelectedTaskPriority(e.target.value as 'high' | 'medium' | 'low')}
+                  className="p-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-500 transition-all duration-300 w-full"
+                >
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+              <div className="flex justify-end space-x-4">
+                <button
+                  onClick={handleCloseEditDialog}
+                  className="bg-gray-300 text-slate-700 p-3 rounded-lg font-bold text-lg hover:bg-gray-400 transition-all duration-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUpdateTaskPriority}
+                  className="bg-blue-500 text-white p-3 rounded-lg font-bold text-lg hover:bg-blue-600 transition-all duration-300"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
