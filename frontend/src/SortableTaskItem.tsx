@@ -11,11 +11,16 @@ interface SortableTaskItemProps {
 }
 
 export function SortableTaskItem({ task, handleOpenEditDialog }: SortableTaskItemProps) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task.id });
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task.id, disabled: task.priority === 'break' });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
+  };
+
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    handleOpenEditDialog(task);
   };
 
   return (
@@ -28,7 +33,7 @@ export function SortableTaskItem({ task, handleOpenEditDialog }: SortableTaskIte
               {task.startTime} - {task.endTime}
             </Typography>
             {task.priority !== 'break' && (
-              <IconButton onClick={() => handleOpenEditDialog(task)}>
+              <IconButton onClick={handleEditClick}>
                 <EditIcon />
               </IconButton>
             )}

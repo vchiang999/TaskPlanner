@@ -43,7 +43,7 @@ const theme = createTheme({
       main: '#2196f3', // Blue
     },
     background: {
-      default: '#f5f5f5', // Light gray
+      default: '#f5f5f5', // Light grey
     },
   },
   typography: {
@@ -61,7 +61,7 @@ const theme = createTheme({
 
 // Helper function to format time
 const formatTime = (date: Date) => {
-  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
+  return date.toLocaleTimeString('en-GB', { hour: 'numeric', minute: 'numeric', hour12: true });
 };
 
 function App() {
@@ -170,9 +170,7 @@ function App() {
       const newIndex = tasks.findIndex((task) => task.id === over.id);
 
       const newTasks = arrayMove(tasks, oldIndex, newIndex);
-      const newTasksWithoutBreaks = newTasks.filter(task => task.priority !== 'break');
-
-      updateTasks(newTasksWithoutBreaks);
+      updateTasks(newTasks.filter(task => task.priority !== 'break'));
     }
   };
 
@@ -188,7 +186,7 @@ function App() {
       </AppBar>
       <Container maxWidth="md" sx={{ mt: 4 }}>
         <Typography variant="h2" component="p" gutterBottom>
-          Helping kids organize their day!
+          Helping kids organise their day!
         </Typography>
         <Box component="form" onSubmit={handleAddTask} sx={{ mb: 4 }}>
           <TextField
