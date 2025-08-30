@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   AppBar,
   Box,
@@ -19,7 +19,7 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material';
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTaskItem } from './SortableTaskItem';
 
@@ -78,24 +78,17 @@ function App() {
 
   const sensors = useSensors(
     useSensor(PointerSensor),
+    useSensor(TouchSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
 
-  const updateTasks = (updatedTasks: Omit<Task, 'startTime' | 'endTime'>[]) => {
-    const tasksWithBreaks: Omit<Task, 'startTime' | 'endTime'>[] = [];
-    updatedTasks.forEach((task, index) => {
-      tasksWithBreaks.push(task);
-      if (index < updatedTasks.length - 1) {
-        tasksWithBreaks.push({ id: Date.now() + index, text: 'Break Time', completed: false, priority: 'break' });
-      }
-    });
-
+  const scheduledTasks = useMemo(() => {
     let currentTime = new Date();
     currentTime.setHours(9, 0, 0, 0); // Start at 9:00 AM
 
-    const finalTasks = tasksWithBreaks.map((task) => {
+    return tasks.map((task) => {
       const taskDuration = task.priority === 'break' ? 15 : 30;
       const startTime = new Date(currentTime);
       const endTime = new Date(currentTime.getTime() + taskDuration * 60000);
@@ -108,9 +101,7 @@ function App() {
         endTime: formatTime(endTime),
       };
     });
-
-    setTasks(finalTasks as Task[]);
-  };
+  }, [tasks]);
 
   // Handle form submission to add a new task
   const handleAddTask = (e: React.FormEvent) => {
@@ -125,13 +116,20 @@ function App() {
     };
 
     const currentTasks = tasks.filter((task) => task.priority !== 'break');
-    const updatedTasks = [...currentTasks, newTask].sort((a, b) => {
-      const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 };
-      if (a.priority === 'break' || b.priority === 'break') return 0;
+    const sortedTasks = [...currentTasks, newTask].sort((a, b) => {
+      const priorityOrder = { high: 1, medium: 2, low: 3 };
       return priorityOrder[a.priority] - priorityOrder[b.priority];
     });
 
-    updateTasks(updatedTasks);
+    const tasksWithBreaks: Omit<Task, 'startTime' | 'endTime'>[] = [];
+    sortedTasks.forEach((task, index) => {
+      tasksWithBreaks.push(task);
+      if (index < sortedTasks.length - 1) {
+        tasksWithBreaks.push({ id: Date.now() + index, text: 'Break Time', completed: false, priority: 'break' });
+      }
+    });
+
+    setTasks(tasksWithBreaks as Task[]);
     setNewTaskText(''); // Clear the input field
     setNewTaskPriority('medium'); // Reset the priority dropdown
   };
@@ -149,15 +147,24 @@ function App() {
 
   const handleUpdateTaskPriority = () => {
     if (selectedTask) {
-      const updatedTasks = tasks.filter(t => t.priority !== 'break').map((task) =>
+      const updatedTasks = tasks.map((task) =>
         task.id === selectedTask.id ? { ...task, priority: selectedTaskPriority } : task
-      ).sort((a, b) => {
-        const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 };
-        if (a.priority === 'break' || b.priority === 'break') return 0;
+      );
+
+      const sortedTasks = updatedTasks.filter(t => t.priority !== 'break').sort((a, b) => {
+        const priorityOrder = { high: 1, medium: 2, low: 3 };
         return priorityOrder[a.priority] - priorityOrder[b.priority];
       });
 
-      updateTasks(updatedTasks);
+      const tasksWithBreaks: Omit<Task, 'startTime' | 'endTime'>[] = [];
+      sortedTasks.forEach((task, index) => {
+        tasksWithBreaks.push(task);
+        if (index < sortedTasks.length - 1) {
+          tasksWithBreaks.push({ id: Date.now() + index, text: 'Break Time', completed: false, priority: 'break' });
+        }
+      });
+
+      setTasks(tasksWithBreaks as Task[]);
       handleCloseEditDialog();
     }
   };
@@ -169,8 +176,9 @@ function App() {
       const oldIndex = tasks.findIndex((task) => task.id === active.id);
       const newIndex = tasks.findIndex((task) => task.id === over.id);
 
-      const newTasks = arrayMove(tasks, oldIndex, newIndex);
-      updateTasks(newTasks.filter(task => task.priority !== 'break'));
+      setTasks((tasks) => {
+        return arrayMove(tasks, oldIndex, newIndex);
+      });
     }
   };
 
@@ -221,7 +229,7 @@ function App() {
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
             <Box>
-              {tasks.map((task) => (
+              {scheduledTasks.map((task) => (
                 <SortableTaskItem key={task.id} task={task} handleOpenEditDialog={handleOpenEditDialog} />
               ))}
             </Box>
@@ -256,3 +264,4 @@ function App() {
 }
 
 export default App;
+// Dummy comment to trigger CI/CD
