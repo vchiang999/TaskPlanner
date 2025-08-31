@@ -22,8 +22,11 @@ export function SortableTaskItem({ task, handleOpenEditDialog, index }: Sortable
   };
 
   const handleEditClick = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
-    handleOpenEditDialog(task);
+    if (task.priority !== 'break') {
+      handleOpenEditDialog(task);
+    }
   };
 
   const getPriorityStyles = (priority: Task['priority']) => {
@@ -118,18 +121,20 @@ export function SortableTaskItem({ task, handleOpenEditDialog, index }: Sortable
     transition: 'all 0.2s ease'
   };
 
+  // Separate drag listeners from the edit button area
+  const dragProps = task.priority === 'break' ? {} : { ...attributes, ...listeners };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
     >
       <div 
         style={cardStyle}
         className={`transform transition-all duration-500 hover:scale-105 hover:shadow-lg ${
           task.priority === 'break' ? '' : 'cursor-grab active:cursor-grabbing'
         }`}
+        {...dragProps}
         onMouseEnter={(e) => {
           if (task.priority !== 'break') {
             e.currentTarget.style.transform = isVisible ? 'translateY(0) scale(1.02)' : 'translateY(20px) scale(0.97)';
@@ -149,7 +154,7 @@ export function SortableTaskItem({ task, handleOpenEditDialog, index }: Sortable
           )}
           {task.priority === 'break' && (
             <span style={{ fontSize: '2rem', color: priorityStyles.color }}>
-              {Math.random() > 0.5 ? '☕' : '🎮'}
+              {task.breakEmoji || '☕'}
             </span>
           )}
           <p style={{ 
@@ -168,7 +173,11 @@ export function SortableTaskItem({ task, handleOpenEditDialog, index }: Sortable
           {task.priority !== 'break' && (
             <button 
               onClick={handleEditClick} 
-              style={editButtonStyle}
+              style={{
+                ...editButtonStyle,
+                position: 'relative',
+                zIndex: 10
+              }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = 'rgba(255, 255, 255, 1)';
                 e.currentTarget.style.transform = 'scale(1.1)';

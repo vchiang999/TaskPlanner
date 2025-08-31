@@ -13,6 +13,7 @@ export interface Task {
   startTime: string;
   endTime: string;
   emoji?: string;
+  breakEmoji?: string; // Fixed emoji for break times
 }
 
 // Helper function to format time
@@ -41,8 +42,17 @@ function App() {
   const [selectedTaskPriority, setSelectedTaskPriority] = useState<'high' | 'medium' | 'low'>('medium');
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(TouchSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Require 8px of movement before drag starts
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200, // 200ms delay before drag starts on touch
+        tolerance: 8,
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -50,10 +60,20 @@ function App() {
 
   const recalculateSchedule = (currentTasks: Omit<Task, 'startTime' | 'endTime'>[]) => {
     const tasksWithBreaks: Omit<Task, 'startTime' | 'endTime'>[] = [];
+    const breakEmojis = ['☕', '🎮', '🍎', '🧃', '⚽', '🎨'];
+    
     currentTasks.forEach((task, index) => {
       tasksWithBreaks.push(task);
       if (index < currentTasks.length - 1) {
-        tasksWithBreaks.push({ id: Date.now() + index, text: 'Break Time', completed: false, priority: 'break' });
+        // Create unique break with consistent emoji
+        const breakEmoji = breakEmojis[index % breakEmojis.length];
+        tasksWithBreaks.push({ 
+          id: Date.now() + Math.random() * 1000 + index, // More unique ID
+          text: 'Break Time', 
+          completed: false, 
+          priority: 'break',
+          breakEmoji: breakEmoji
+        });
       }
     });
 
@@ -129,13 +149,36 @@ function App() {
   const handleDragEnd = (event: any) => {
     const { active, over } = event;
 
-    if (active.id !== over.id) {
-      const oldIndex = tasks.findIndex((task) => task.id === active.id);
-      const newIndex = tasks.findIndex((task) => task.id === over.id);
+    if (!over || active.id === over.id) return;
 
-      setTasks((tasks) => {
-        return arrayMove(tasks, oldIndex, newIndex);
-      });
+    // Only allow dragging of non-break tasks
+    const activeTask = tasks.find(task => task.id === active.id);
+    if (!activeTask || activeTask.priority === 'break') return;
+
+    // Get only the actual tasks (no breaks) and reorder them
+    const actualTasks = tasks.filter(task => task.priority !== 'break');
+    const oldIndex = actualTasks.findIndex((task) => task.id === active.id);
+    const overTask = tasks.find(task => task.id === over.id);
+    
+    if (!overTask) return;
+
+    let newIndex;
+    if (overTask.priority === 'break') {
+      // If dropping on a break, find the adjacent task
+      const overTaskIndex = tasks.findIndex(task => task.id === over.id);
+      const nextTask = tasks[overTaskIndex + 1];
+      if (nextTask && nextTask.priority !== 'break') {
+        newIndex = actualTasks.findIndex(task => task.id === nextTask.id);
+      } else {
+        newIndex = actualTasks.length - 1;
+      }
+    } else {
+      newIndex = actualTasks.findIndex((task) => task.id === over.id);
+    }
+
+    if (oldIndex !== newIndex) {
+      const reorderedTasks = arrayMove(actualTasks, oldIndex, newIndex);
+      setTasks(recalculateSchedule(reorderedTasks));
     }
   };
 
