@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTaskItem } from './SortableTaskItem';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Settings } from 'lucide-react';
 
 // A simple interface to define the shape of a task object
 export interface Task {
@@ -40,6 +40,11 @@ function App() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedTaskPriority, setSelectedTaskPriority] = useState<'high' | 'medium' | 'low'>('medium');
+  
+  // New break time settings
+  const [includeBreaks, setIncludeBreaks] = useState(true);
+  const [breakDuration, setBreakDuration] = useState(15); // minutes
+  const [taskDuration, setTaskDuration] = useState(30); // minutes
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -64,7 +69,9 @@ function App() {
     
     currentTasks.forEach((task, index) => {
       tasksWithBreaks.push(task);
-      if (index < currentTasks.length - 1) {
+      
+      // Add breaks based on settings
+      if (includeBreaks && index < currentTasks.length - 1) {
         // Create unique break with consistent emoji
         const breakEmoji = breakEmojis[index % breakEmojis.length];
         tasksWithBreaks.push({ 
@@ -77,13 +84,26 @@ function App() {
       }
     });
 
+    // Ensure at least one break if there are multiple tasks
+    if (includeBreaks && currentTasks.length > 1 && tasksWithBreaks.filter(t => t.priority === 'break').length === 0) {
+      // Add a break after the first task
+      const breakEmoji = breakEmojis[0];
+      tasksWithBreaks.splice(1, 0, {
+        id: Date.now() + Math.random() * 1000,
+        text: 'Break Time',
+        completed: false,
+        priority: 'break',
+        breakEmoji: breakEmoji
+      });
+    }
+
     let currentTime = new Date();
     currentTime.setHours(9, 0, 0, 0);
 
     const finalTasks = tasksWithBreaks.map((task) => {
-      const taskDuration = task.priority === 'break' ? 15 : 30;
+      const duration = task.priority === 'break' ? breakDuration : taskDuration;
       const startTime = new Date(currentTime);
-      const endTime = new Date(currentTime.getTime() + taskDuration * 60000);
+      const endTime = new Date(currentTime.getTime() + duration * 60000);
 
       currentTime = endTime;
 
@@ -119,6 +139,14 @@ function App() {
     setNewTaskPriority('medium');
   };
 
+  const handleTaskComplete = (taskId: number) => {
+    setTasks(prevTasks => 
+      prevTasks.map(task => 
+        task.id === taskId ? { ...task, completed: !task.completed } : task
+      )
+    );
+  };
+
   const handleOpenEditDialog = (task: Task) => {
     setSelectedTask(task);
     setSelectedTaskPriority(task.priority as 'high' | 'medium' | 'low');
@@ -143,6 +171,14 @@ function App() {
 
       setTasks(recalculateSchedule(sortedTasks));
       handleCloseEditDialog();
+    }
+  };
+
+  const handleBreakSettingsChange = () => {
+    // Recalculate schedule when break settings change
+    const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
+    if (currentTasksWithoutBreaks.length > 0) {
+      setTasks(recalculateSchedule(currentTasksWithoutBreaks));
     }
   };
 
@@ -188,19 +224,17 @@ function App() {
     background: 'linear-gradient(135deg, #e0f2fe 0%, #b3e5fc 100%)',
     fontFamily: "'Poppins', 'Comic Sans MS', cursive, sans-serif",
     color: '#334155',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
     padding: '16px'
   };
 
-  const cardStyle = {
+  const mainCardStyle = {
     background: 'white',
     borderRadius: '24px',
     boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
     padding: '32px',
     width: '100%',
-    maxWidth: '672px'
+    maxWidth: '1200px',
+    margin: '0 auto'
   };
 
   const headerStyle = {
@@ -248,9 +282,16 @@ function App() {
     width: '100%'
   };
 
+  const columnStyle = {
+    background: '#f8fafc',
+    padding: '24px',
+    borderRadius: '12px',
+    height: 'fit-content'
+  };
+
   return (
-    <div style={containerStyle} className="min-h-screen bg-gradient-to-br from-sky-100 to-blue-200 font-poppins text-slate-700 flex justify-center items-center p-4">
-      <div style={cardStyle} className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-2xl">
+    <div style={containerStyle} className="min-h-screen bg-gradient-to-br from-sky-100 to-blue-200 font-poppins text-slate-700 p-4">
+      <div style={mainCardStyle} className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-6xl mx-auto">
         <header style={headerStyle} className="text-center mb-8">
           <h1 style={titleStyle} className="text-5xl font-bold text-blue-600 mb-2">
             🌟 Daily Task Planner 🌟
@@ -260,69 +301,161 @@ function App() {
           </p>
         </header>
 
-        <section className="mb-8" style={{ marginBottom: '32px' }}>
-          <h2 className="text-3xl font-semibold mb-4" style={{ fontSize: '1.875rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }}>
-            ✨ Add a New Task
-          </h2>
-          <form onSubmit={handleAddTask} style={{ display: 'grid', gap: '16px' }}>
-            <input
-              type="text"
-              placeholder="What do you need to do? 🤔"
-              value={newTaskText}
-              onChange={(e) => setNewTaskText(e.target.value)}
-              style={inputStyle}
-              className="p-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-500 transition-all duration-300"
-            />
-            <select
-              value={newTaskPriority}
-              onChange={(e) => setNewTaskPriority(e.target.value as 'high' | 'medium' | 'low')}
-              style={inputStyle}
-              className="p-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-500 transition-all duration-300"
-            >
-              <option value="medium">🟡 Medium Priority</option>
-              <option value="high">🔴 High Priority</option>
-              <option value="low">🟢 Low Priority</option>
-            </select>
-            <button
-              type="submit"
-              style={buttonStyle}
-              className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-3 rounded-lg font-bold text-lg flex items-center justify-center space-x-2 hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105"
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'scale(1.05)';
-                e.currentTarget.style.background = 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)';
-              }}
-            >
-              <PlusCircle size={24} />
-              <span>Add Task</span>
-            </button>
-          </form>
-        </section>
+        {/* Two Column Layout */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          
+          {/* Left Column - Task Input */}
+          <div style={columnStyle} className="bg-slate-50 p-6 rounded-lg">
+            <h2 style={{ fontSize: '1.875rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }} className="text-3xl font-semibold mb-4">
+              ✨ Add New Tasks
+            </h2>
+            
+            <form onSubmit={handleAddTask} style={{ display: 'grid', gap: '16px', marginBottom: '24px' }}>
+              <input
+                type="text"
+                placeholder="What do you need to do? 🤔"
+                value={newTaskText}
+                onChange={(e) => setNewTaskText(e.target.value)}
+                style={inputStyle}
+                className="p-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-500 transition-all duration-300"
+              />
+              <select
+                value={newTaskPriority}
+                onChange={(e) => setNewTaskPriority(e.target.value as 'high' | 'medium' | 'low')}
+                style={inputStyle}
+                className="p-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-500 transition-all duration-300"
+              >
+                <option value="medium">🟡 Medium Priority</option>
+                <option value="high">🔴 High Priority</option>
+                <option value="low">🟢 Low Priority</option>
+              </select>
+              <button
+                type="submit"
+                style={buttonStyle}
+                className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-3 rounded-lg font-bold text-lg flex items-center justify-center space-x-2 hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)';
+                }}
+              >
+                <PlusCircle size={24} />
+                <span>Add Task</span>
+              </button>
+            </form>
 
-        <section style={{ background: '#f8fafc', padding: '24px', borderRadius: '12px' }} className="bg-slate-50 p-6 rounded-lg">
-          <h2 style={{ fontSize: '1.875rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }} className="text-3xl font-semibold mb-4">
-            📅 My Timetable
-          </h2>
-          {tasks.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-              <div style={{ fontSize: '4rem', marginBottom: '16px' }}>📝</div>
-              <p style={{ fontSize: '1.125rem' }}>No tasks yet! Add your first task above to get started.</p>
-            </div>
-          ) : (
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-                <div>
-                  {tasks.map((task, index) => (
-                    <SortableTaskItem key={task.id} task={task} handleOpenEditDialog={handleOpenEditDialog} index={index} />
-                  ))}
+            {/* Break Time Settings */}
+            <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '24px' }}>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Settings size={24} />
+                Break Time Settings
+              </h3>
+              
+              <div style={{ display: 'grid', gap: '16px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.125rem', fontWeight: '500' }}>
+                  <input
+                    type="checkbox"
+                    checked={includeBreaks}
+                    onChange={(e) => {
+                      setIncludeBreaks(e.target.checked);
+                      setTimeout(handleBreakSettingsChange, 0);
+                    }}
+                    style={{ width: '20px', height: '20px', accentColor: '#3b82f6' }}
+                  />
+                  Include break times
+                </label>
+
+                {includeBreaks && (
+                  <>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '1rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
+                        Break duration (minutes)
+                      </label>
+                      <select
+                        value={breakDuration}
+                        onChange={(e) => {
+                          setBreakDuration(Number(e.target.value));
+                          setTimeout(handleBreakSettingsChange, 0);
+                        }}
+                        style={inputStyle}
+                      >
+                        <option value={5}>5 minutes</option>
+                        <option value={10}>10 minutes</option>
+                        <option value={15}>15 minutes</option>
+                        <option value={20}>20 minutes</option>
+                        <option value={30}>30 minutes</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '1rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
+                        Task duration (minutes)
+                      </label>
+                      <select
+                        value={taskDuration}
+                        onChange={(e) => {
+                          setTaskDuration(Number(e.target.value));
+                          setTimeout(handleBreakSettingsChange, 0);
+                        }}
+                        style={inputStyle}
+                      >
+                        <option value={15}>15 minutes</option>
+                        <option value={20}>20 minutes</option>
+                        <option value={30}>30 minutes</option>
+                        <option value={45}>45 minutes</option>
+                        <option value={60}>60 minutes</option>
+                      </select>
+                    </div>
+                  </>
+                )}
+
+                <div style={{ 
+                  background: '#dbeafe', 
+                  padding: '12px', 
+                  borderRadius: '8px', 
+                  fontSize: '0.875rem', 
+                  color: '#1e40af',
+                  border: '1px solid #93c5fd'
+                }}>
+                  💡 <strong>Tip:</strong> At least one break time will be added if you have multiple tasks to help you rest!
                 </div>
-              </SortableContext>
-            </DndContext>
-          )}
-        </section>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column - Timetable */}
+          <div style={columnStyle} className="bg-slate-50 p-6 rounded-lg">
+            <h2 style={{ fontSize: '1.875rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }} className="text-3xl font-semibold mb-4">
+              📅 My Timetable
+            </h2>
+            
+            {tasks.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                <div style={{ fontSize: '4rem', marginBottom: '16px' }}>📝</div>
+                <p style={{ fontSize: '1.125rem' }}>No tasks yet! Add your first task to get started.</p>
+              </div>
+            ) : (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                  <div>
+                    {tasks.map((task, index) => (
+                      <SortableTaskItem 
+                        key={task.id} 
+                        task={task} 
+                        handleOpenEditDialog={handleOpenEditDialog} 
+                        handleTaskComplete={handleTaskComplete}
+                        index={index} 
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            )}
+          </div>
+        </div>
 
         {editDialogOpen && selectedTask && (
           <div style={{

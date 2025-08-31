@@ -7,10 +7,11 @@ import { Task } from './App';
 interface SortableTaskItemProps {
   task: Task;
   handleOpenEditDialog: (task: Task) => void;
+  handleTaskComplete: (taskId: number) => void;
   index: number;
 }
 
-export function SortableTaskItem({ task, handleOpenEditDialog, index }: SortableTaskItemProps) {
+export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplete, index }: SortableTaskItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ 
     id: task.id, 
     disabled: task.priority === 'break' 
@@ -27,6 +28,17 @@ export function SortableTaskItem({ task, handleOpenEditDialog, index }: Sortable
     if (task.priority !== 'break') {
       handleOpenEditDialog(task);
     }
+  };
+
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    if (task.priority !== 'break') {
+      handleTaskComplete(task.id);
+    }
+  };
+
+  const handleCheckboxClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
   };
 
   const getPriorityStyles = (priority: Task['priority']) => {
@@ -80,7 +92,9 @@ export function SortableTaskItem({ task, handleOpenEditDialog, index }: Sortable
     ...priorityStyles,
     padding: '16px',
     borderRadius: '12px',
-    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+    boxShadow: task.completed 
+      ? '0 2px 4px -1px rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.03)' 
+      : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -88,7 +102,8 @@ export function SortableTaskItem({ task, handleOpenEditDialog, index }: Sortable
     cursor: task.priority === 'break' ? 'default' : 'grab',
     transition: 'all 0.3s ease',
     transform: isVisible ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.95)',
-    opacity: isVisible ? 1 : 0
+    opacity: isVisible ? (task.completed && task.priority !== 'break' ? 0.7 : 1) : 0,
+    filter: task.completed && task.priority !== 'break' ? 'saturate(0.7)' : 'none'
   };
 
   const leftSectionStyle = {
@@ -147,8 +162,31 @@ export function SortableTaskItem({ task, handleOpenEditDialog, index }: Sortable
         }}
       >
         <div style={leftSectionStyle}>
+          {/* Checkbox for task completion */}
+          {task.priority !== 'break' && (
+            <input
+              type="checkbox"
+              checked={task.completed}
+              onChange={handleCheckboxChange}
+              onClick={handleCheckboxClick}
+              style={{
+                width: '20px',
+                height: '20px',
+                accentColor: '#3b82f6',
+                cursor: 'pointer',
+                position: 'relative',
+                zIndex: 10
+              }}
+            />
+          )}
+          
           {task.priority !== 'break' && task.emoji && (
-            <span style={{ fontSize: '2rem', filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.1))' }}>
+            <span style={{ 
+              fontSize: '2rem', 
+              filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.1))',
+              opacity: task.completed ? 0.5 : 1,
+              transition: 'opacity 0.3s ease'
+            }}>
               {task.emoji}
             </span>
           )}
@@ -161,7 +199,10 @@ export function SortableTaskItem({ task, handleOpenEditDialog, index }: Sortable
             fontSize: '1.125rem', 
             fontWeight: '600', 
             margin: 0,
-            textShadow: '1px 1px 2px rgba(0,0,0,0.1)'
+            textShadow: '1px 1px 2px rgba(0,0,0,0.1)',
+            textDecoration: task.completed ? 'line-through' : 'none',
+            opacity: task.completed ? 0.6 : 1,
+            transition: 'all 0.3s ease'
           }}>
             {task.text}
           </p>
