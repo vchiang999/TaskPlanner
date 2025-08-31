@@ -16,9 +16,13 @@ export interface Task {
   breakEmoji?: string; // Fixed emoji for break times
 }
 
-// Helper function to format time
+// Helper function to format time consistently
 const formatTime = (date: Date) => {
-  return date.toLocaleTimeString('en-GB', { hour: 'numeric', minute: 'numeric', hour12: true });
+  return date.toLocaleTimeString('en-US', { 
+    hour: 'numeric', 
+    minute: '2-digit', 
+    hour12: true 
+  });
 };
 
 // Function to automatically assign emoji based on task text
@@ -89,11 +93,11 @@ function App() {
   // Handle school day toggle
   useEffect(() => {
     if (isSchoolDay) {
-      setStartHour(16); // 4 PM
-      setEndHour(18);   // 6 PM
+      setStartHour(15); // 3 PM
+      setEndHour(19);   // 7 PM
     } else {
       setStartHour(9);  // 9 AM
-      setEndHour(16);   // 4 PM
+      setEndHour(19);   // 7 PM
     }
   }, [isSchoolDay]);
 
@@ -255,17 +259,8 @@ function App() {
 
     const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
     
-    // If user has manually reordered tasks, preserve the order and just append new task
-    let finalTasks;
-    if (userHasManuallyReordered) {
-      finalTasks = [...currentTasksWithoutBreaks, newTask];
-    } else {
-      // Auto-sort by priority only if user hasn't manually reordered
-      finalTasks = [...currentTasksWithoutBreaks, newTask].sort((a, b) => {
-        const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 };
-        return priorityOrder[a.priority] - priorityOrder[b.priority];
-      });
-    }
+    // Never auto-rearrange - always append new tasks to the end
+    const finalTasks = [...currentTasksWithoutBreaks, newTask];
 
     setTasks(recalculateSchedule(finalTasks));
     setNewTaskText('');
@@ -330,12 +325,9 @@ function App() {
         } : task
       );
 
-      const sortedTasks = updatedTasks.filter(t => t.priority !== 'break').sort((a, b) => {
-        const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 };
-        return priorityOrder[a.priority] - priorityOrder[b.priority];
-      });
+      const tasksWithoutBreaks = updatedTasks.filter(t => t.priority !== 'break');
 
-      setTasks(recalculateSchedule(sortedTasks));
+      setTasks(recalculateSchedule(tasksWithoutBreaks));
       handleCloseEditDialog();
     }
   };
@@ -686,12 +678,12 @@ function App() {
                     marginBottom: '16px'
                   }}>
                     {isMobile ? (
-                      <>📚 School: 4-6 PM<br />🏠 Free: 9 AM-4 PM</>
+                      <>📚 School: 3:00 PM - 7:00 PM<br />🏠 Free: 9:00 AM - 7:00 PM</>
                     ) : (
                       <>
-                        📚 <strong>School day:</strong> Plan activities from 4 PM to 6 PM (after school!)
+                        📚 <strong>School day:</strong> Plan activities from 3:00 PM to 7:00 PM (after school!)
                         <br />
-                        🏠 <strong>Free day:</strong> Plan activities from 9 AM to 4 PM (whole day fun!)
+                        🏠 <strong>Free day:</strong> Plan activities from 9:00 AM to 7:00 PM (whole day fun!)
                       </>
                     )}
                   </div>

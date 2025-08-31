@@ -49,11 +49,32 @@
         }
       }
 
-      /* Safe area support for iOS */
-      html, body {
+      /* Complete iOS safe area and background fix */
+      html {
         background: linear-gradient(135deg, #e0f2fe 0%, #b3e5fc 100%);
-        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+        background-attachment: fixed;
+        min-height: 100vh;
+        min-height: 100dvh;
+      }
+      
+      body {
+        background: linear-gradient(135deg, #e0f2fe 0%, #b3e5fc 100%);
+        background-attachment: fixed;
         margin: 0;
+        padding: 0;
+        min-height: 100vh;
+        min-height: 100dvh;
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+      }
+      
+      #root {
+        background: linear-gradient(135deg, #e0f2fe 0%, #b3e5fc 100%);
+        background-attachment: fixed;
+        min-height: 100vh;
+        min-height: 100dvh;
       }
       
       /* Prevent zoom on input focus for iOS */
