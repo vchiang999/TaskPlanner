@@ -1,17 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Edit } from 'lucide-react';
+import { Edit, Trash2 } from 'lucide-react';
 import { Task } from './App';
 
 interface SortableTaskItemProps {
   task: Task;
   handleOpenEditDialog: (task: Task) => void;
   handleTaskComplete: (taskId: number) => void;
+  handleDeleteTask: (taskId: number) => void;
   index: number;
 }
 
-export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplete, index }: SortableTaskItemProps) {
+export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplete, handleDeleteTask, index }: SortableTaskItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ 
     id: task.id, 
     disabled: task.priority === 'break' 
@@ -39,6 +40,14 @@ export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplet
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (task.priority !== 'break') {
+      handleDeleteTask(task.id);
+    }
   };
 
   const getPriorityStyles = (priority: Task['priority']) => {
@@ -236,24 +245,48 @@ export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplet
             {task.startTime} - {task.endTime}
           </span>
           {task.priority !== 'break' && (
-            <button 
-              onClick={handleEditClick} 
-              style={{
-                ...editButtonStyle,
-                position: 'relative',
-                zIndex: 10
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 1)';
-                e.currentTarget.style.transform = 'scale(1.1)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.8)';
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
-            >
-              <Edit size={18} style={{ color: priorityStyles.color }} />
-            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                onClick={handleEditClick} 
+                style={{
+                  ...editButtonStyle,
+                  position: 'relative',
+                  zIndex: 10
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 1)';
+                  e.currentTarget.style.transform = 'scale(1.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.8)';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+                title="Edit activity"
+              >
+                <Edit size={18} style={{ color: priorityStyles.color }} />
+              </button>
+              
+              <button 
+                onClick={handleDeleteClick} 
+                style={{
+                  ...editButtonStyle,
+                  position: 'relative',
+                  zIndex: 10,
+                  background: 'rgba(239, 68, 68, 0.1)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                  e.currentTarget.style.transform = 'scale(1.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+                title="Delete activity"
+              >
+                <Trash2 size={18} style={{ color: '#ef4444' }} />
+              </button>
+            </div>
           )}
         </div>
       </div>

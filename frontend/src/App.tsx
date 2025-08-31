@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTaskItem } from './SortableTaskItem';
-import { PlusCircle, Settings, Clock, AlertTriangle } from 'lucide-react';
+import { PlusCircle, Settings, Clock, AlertTriangle, GraduationCap } from 'lucide-react';
 
 // A simple interface to define the shape of a task object
 export interface Task {
@@ -33,7 +33,10 @@ const getEmojiForTask = (taskText: string): string => {
   return '⭐';
 };
 
-
+// Function to round to nearest 10 minutes
+const roundToNearest10 = (minutes: number): number => {
+  return Math.max(10, Math.floor(minutes / 10) * 10);
+};
 
 function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -42,14 +45,16 @@ function App() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedTaskPriority, setSelectedTaskPriority] = useState<'high' | 'medium' | 'low'>('medium');
+  const [editTaskText, setEditTaskText] = useState('');
   
   // Break time and schedule settings
   const [includeBreaks, setIncludeBreaks] = useState(true);
-  const [breakDuration, setBreakDuration] = useState(10); // Changed default to 10 minutes
+  const [breakDuration, setBreakDuration] = useState(10);
   const [taskDuration, setTaskDuration] = useState(30);
-  const [tasksPerBreak, setTasksPerBreak] = useState(2); // New: tasks before each break
-  const [startHour, setStartHour] = useState(9); // Start of day
-  const [endHour, setEndHour] = useState(16); // End of day (4 PM)
+  const [tasksPerBreak, setTasksPerBreak] = useState(2);
+  const [startHour, setStartHour] = useState(9);
+  const [endHour, setEndHour] = useState(16);
+  const [isSchoolDay, setIsSchoolDay] = useState(false);
   
   // Warning states
   const [showTimeWarning, setShowTimeWarning] = useState(false);
@@ -72,14 +77,23 @@ function App() {
     })
   );
 
-
+  // Handle school day toggle
+  useEffect(() => {
+    if (isSchoolDay) {
+      setStartHour(16); // 4 PM
+      setEndHour(18);   // 6 PM
+    } else {
+      setStartHour(9);  // 9 AM
+      setEndHour(16);   // 4 PM
+    }
+  }, [isSchoolDay]);
 
   const recalculateSchedule = (currentTasks: Omit<Task, 'startTime' | 'endTime'>[]) => {
     const actualTasks = currentTasks.filter(t => t.priority !== 'break');
     const tasksWithBreaks: Omit<Task, 'startTime' | 'endTime'>[] = [];
     const breakEmojis = ['☕', '🎮', '🍎', '🧃', '⚽', '🎨'];
     
-    // Add tasks and breaks based on tasksPerBreak setting
+    // Fixed break insertion logic
     actualTasks.forEach((task, index) => {
       tasksWithBreaks.push(task);
       
@@ -98,19 +112,6 @@ function App() {
         });
       }
     });
-
-    // Ensure at least one break if there are multiple tasks and no breaks were added
-    if (includeBreaks && actualTasks.length > 1 && tasksWithBreaks.filter(t => t.priority === 'break').length === 0) {
-      const breakEmoji = breakEmojis[0];
-      const insertIndex = Math.min(tasksPerBreak, actualTasks.length - 1);
-      tasksWithBreaks.splice(insertIndex, 0, {
-        id: Date.now() + Math.random() * 1000,
-        text: 'Break Time',
-        completed: false,
-        priority: 'break',
-        breakEmoji: breakEmoji
-      });
-    }
 
     // Calculate schedule starting from startHour
     let currentTime = new Date();
@@ -137,14 +138,13 @@ function App() {
   useEffect(() => {
     const actualTasks = tasks.filter(t => t.priority !== 'break');
     if (actualTasks.length > 0) {
-      // Calculate time requirements inline to avoid dependency issues
       const numTasks = actualTasks.length;
       const availableMinutes = (endHour - startHour) * 60;
       const numBreaks = includeBreaks ? Math.floor((numTasks - 1) / tasksPerBreak) : 0;
       const totalMinutes = (numTasks * taskDuration) + (numBreaks * breakDuration);
       
       const fits = totalMinutes <= availableMinutes;
-      const suggestedDuration = numTasks > 0 ? Math.floor((availableMinutes - (numBreaks * breakDuration)) / numTasks) : taskDuration;
+      const suggestedDuration = numTasks > 0 ? roundToNearest10((availableMinutes - (numBreaks * breakDuration)) / numTasks) : taskDuration;
       
       setShowTimeWarning(!fits);
       setSuggestedTaskDuration(suggestedDuration);
@@ -184,21 +184,33 @@ function App() {
     );
   };
 
+  const handleDeleteTask = (taskId: number) => {
+    const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break' && task.id !== taskId);
+    setTasks(recalculateSchedule(currentTasksWithoutBreaks));
+  };
+
   const handleOpenEditDialog = (task: Task) => {
     setSelectedTask(task);
     setSelectedTaskPriority(task.priority as 'high' | 'medium' | 'low');
+    setEditTaskText(task.text);
     setEditDialogOpen(true);
   };
 
   const handleCloseEditDialog = () => {
     setEditDialogOpen(false);
     setSelectedTask(null);
+    setEditTaskText('');
   };
 
-  const handleUpdateTaskPriority = () => {
+  const handleUpdateTask = () => {
     if (selectedTask) {
       const updatedTasks = tasks.map((task) =>
-        task.id === selectedTask.id ? { ...task, priority: selectedTaskPriority } : task
+        task.id === selectedTask.id ? { 
+          ...task, 
+          priority: selectedTaskPriority,
+          text: editTaskText.trim() || task.text,
+          emoji: getEmojiForTask(editTaskText.trim() || task.text)
+        } : task
       );
 
       const sortedTasks = updatedTasks.filter(t => t.priority !== 'break').sort((a, b) => {
@@ -212,7 +224,6 @@ function App() {
   };
 
   const handleSettingsChange = () => {
-    // Immediately recalculate schedule when settings change
     const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
     if (currentTasksWithoutBreaks.length > 0) {
       setTasks(recalculateSchedule(currentTasksWithoutBreaks));
@@ -222,7 +233,6 @@ function App() {
   const handleAcceptSuggestedDuration = () => {
     setTaskDuration(suggestedTaskDuration);
     setShowTimeWarning(false);
-    // Trigger recalculation
     setTimeout(handleSettingsChange, 0);
   };
 
@@ -344,10 +354,10 @@ function App() {
       <div style={mainCardStyle} className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-6xl mx-auto">
         <header style={headerStyle} className="text-center mb-8">
           <h1 style={titleStyle} className="text-5xl font-bold text-blue-600 mb-2">
-            🌟 Daily Task Planner 🌟
+            🌟 My Daily Adventure Planner 🌟
           </h1>
           <p style={subtitleStyle} className="text-xl text-slate-600">
-            Help kids organise their day!
+            Plan your awesome day and make it amazing!
           </p>
         </header>
 
@@ -356,11 +366,11 @@ function App() {
           <div style={warningStyle}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
               <AlertTriangle size={20} />
-              <strong>Too many tasks for the day!</strong>
+              <strong>Oops! Too many activities for today!</strong>
             </div>
             <p style={{ margin: '8px 0' }}>
-              Your tasks won't fit between {startHour}:00 and {endHour}:00. 
-              Suggested task duration: {suggestedTaskDuration} minutes.
+              Your activities won't fit between {startHour}:00 and {endHour}:00. 
+              How about {suggestedTaskDuration} minutes per activity?
             </p>
             <button
               onClick={handleAcceptSuggestedDuration}
@@ -374,7 +384,7 @@ function App() {
                 fontWeight: 'bold'
               }}
             >
-              Auto-adjust task duration
+              Yes, adjust my activities!
             </button>
           </div>
         )}
@@ -385,13 +395,13 @@ function App() {
           {/* Left Column - Task Input */}
           <div style={columnStyle} className="bg-slate-50 p-6 rounded-lg">
             <h2 style={{ fontSize: '1.875rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }} className="text-3xl font-semibold mb-4">
-              ✨ Add New Tasks
+              ✨ What's Your Next Adventure?
             </h2>
             
             <form onSubmit={handleAddTask} style={{ display: 'grid', gap: '16px', marginBottom: '24px' }}>
               <input
                 type="text"
-                placeholder="What do you need to do? 🤔"
+                placeholder="What fun thing will you do? 🤔"
                 value={newTaskText}
                 onChange={(e) => setNewTaskText(e.target.value)}
                 style={inputStyle}
@@ -403,9 +413,9 @@ function App() {
                 style={inputStyle}
                 className="p-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-500 transition-all duration-300"
               >
-                <option value="medium">🟡 Medium Priority</option>
-                <option value="high">🔴 High Priority</option>
-                <option value="low">🟢 Low Priority</option>
+                <option value="medium">🟡 Pretty Important</option>
+                <option value="high">🔴 Super Important</option>
+                <option value="low">🟢 When I Have Time</option>
               </select>
               <button
                 type="submit"
@@ -421,21 +431,47 @@ function App() {
                 }}
               >
                 <PlusCircle size={24} />
-                <span>Add Task</span>
+                <span>Add to My Day!</span>
               </button>
             </form>
+
+            {/* School Day Toggle */}
+            <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '24px', marginBottom: '24px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.125rem', fontWeight: '500', marginBottom: '16px' }}>
+                <input
+                  type="checkbox"
+                  checked={isSchoolDay}
+                  onChange={(e) => setIsSchoolDay(e.target.checked)}
+                  style={{ width: '20px', height: '20px', accentColor: '#3b82f6' }}
+                />
+                <GraduationCap size={24} />
+                Is this a school day?
+              </label>
+              <div style={{ 
+                background: '#dbeafe', 
+                padding: '12px', 
+                borderRadius: '8px', 
+                fontSize: '0.875rem', 
+                color: '#1e40af',
+                border: '1px solid #93c5fd'
+              }}>
+                📚 <strong>School day:</strong> Plan activities from 4 PM to 6 PM (after school!)
+                <br />
+                🏠 <strong>Free day:</strong> Plan activities from 9 AM to 4 PM (whole day fun!)
+              </div>
+            </div>
 
             {/* Day Schedule Settings */}
             <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '24px', marginBottom: '24px' }}>
               <h3 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Clock size={24} />
-                Day Schedule
+                My Day Schedule
               </h3>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '1rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
-                    Start of day
+                    Start my day at
                   </label>
                   <select
                     value={startHour}
@@ -444,6 +480,7 @@ function App() {
                       setTimeout(handleSettingsChange, 0);
                     }}
                     style={inputStyle}
+                    disabled={isSchoolDay}
                   >
                     {Array.from({ length: 12 }, (_, i) => i + 6).map(hour => (
                       <option key={hour} value={hour}>
@@ -455,7 +492,7 @@ function App() {
 
                 <div>
                   <label style={{ display: 'block', fontSize: '1rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
-                    End of day
+                    Finish my day at
                   </label>
                   <select
                     value={endHour}
@@ -464,6 +501,7 @@ function App() {
                       setTimeout(handleSettingsChange, 0);
                     }}
                     style={inputStyle}
+                    disabled={isSchoolDay}
                   >
                     {Array.from({ length: 12 }, (_, i) => i + 12).map(hour => (
                       <option key={hour} value={hour}>
@@ -479,7 +517,7 @@ function App() {
             <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '24px' }}>
               <h3 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Settings size={24} />
-                Break Time Settings
+                Fun Break Settings
               </h3>
               
               <div style={{ display: 'grid', gap: '16px' }}>
@@ -493,14 +531,14 @@ function App() {
                     }}
                     style={{ width: '20px', height: '20px', accentColor: '#3b82f6' }}
                   />
-                  Include break times
+                  I want fun breaks!
                 </label>
 
                 {includeBreaks && (
                   <>
                     <div>
                       <label style={{ display: 'block', fontSize: '1rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
-                        Tasks before each break
+                        Activities before each break
                       </label>
                       <select
                         value={tasksPerBreak}
@@ -510,17 +548,17 @@ function App() {
                         }}
                         style={inputStyle}
                       >
-                        <option value={1}>1 task</option>
-                        <option value={2}>2 tasks</option>
-                        <option value={3}>3 tasks</option>
-                        <option value={4}>4 tasks</option>
-                        <option value={5}>5 tasks</option>
+                        <option value={1}>1 activity</option>
+                        <option value={2}>2 activities</option>
+                        <option value={3}>3 activities</option>
+                        <option value={4}>4 activities</option>
+                        <option value={5}>5 activities</option>
                       </select>
                     </div>
 
                     <div>
                       <label style={{ display: 'block', fontSize: '1rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
-                        Break duration (minutes)
+                        How long should breaks be?
                       </label>
                       <select
                         value={breakDuration}
@@ -540,7 +578,7 @@ function App() {
 
                     <div>
                       <label style={{ display: 'block', fontSize: '1rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
-                        Task duration (minutes)
+                        How long for each activity?
                       </label>
                       <select
                         value={taskDuration}
@@ -550,6 +588,7 @@ function App() {
                         }}
                         style={inputStyle}
                       >
+                        <option value={10}>10 minutes</option>
                         <option value={15}>15 minutes</option>
                         <option value={20}>20 minutes</option>
                         <option value={30}>30 minutes</option>
@@ -568,7 +607,7 @@ function App() {
                   color: '#1e40af',
                   border: '1px solid #93c5fd'
                 }}>
-                  💡 <strong>Tip:</strong> Breaks will be added after every {tasksPerBreak} task{tasksPerBreak > 1 ? 's' : ''} to help you rest!
+                  🎉 <strong>Fun fact:</strong> You'll get a break after every {tasksPerBreak} activit{tasksPerBreak > 1 ? 'ies' : 'y'} to recharge!
                 </div>
               </div>
             </div>
@@ -577,13 +616,13 @@ function App() {
           {/* Right Column - Timetable */}
           <div style={columnStyle} className="bg-slate-50 p-6 rounded-lg">
             <h2 style={{ fontSize: '1.875rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }} className="text-3xl font-semibold mb-4">
-              📅 My Timetable
+              📅 My Awesome Day Plan
             </h2>
             
             {tasks.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                <div style={{ fontSize: '4rem', marginBottom: '16px' }}>📝</div>
-                <p style={{ fontSize: '1.125rem' }}>No tasks yet! Add your first task to get started.</p>
+                <div style={{ fontSize: '4rem', marginBottom: '16px' }}>🎯</div>
+                <p style={{ fontSize: '1.125rem' }}>Ready to plan something awesome? Add your first activity!</p>
               </div>
             ) : (
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -595,6 +634,7 @@ function App() {
                         task={task} 
                         handleOpenEditDialog={handleOpenEditDialog} 
                         handleTaskComplete={handleTaskComplete}
+                        handleDeleteTask={handleDeleteTask}
                         index={index} 
                       />
                     ))}
@@ -605,6 +645,7 @@ function App() {
           </div>
         </div>
 
+        {/* Inline Edit Dialog */}
         {editDialogOpen && selectedTask && (
           <div style={{
             position: 'fixed',
@@ -627,11 +668,25 @@ function App() {
               maxWidth: '400px'
             }} className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
               <h3 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '16px' }} className="text-2xl font-semibold mb-4">
-                ✏️ Edit Task Priority
+                ✏️ Edit My Activity
               </h3>
+              
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '1.125rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
-                  Priority
+                  Activity Name
+                </label>
+                <input
+                  type="text"
+                  value={editTaskText}
+                  onChange={(e) => setEditTaskText(e.target.value)}
+                  style={inputStyle}
+                  placeholder="What will you do?"
+                />
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '1.125rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
+                  How Important?
                 </label>
                 <select
                   value={selectedTaskPriority}
@@ -639,11 +694,12 @@ function App() {
                   style={inputStyle}
                   className="p-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-500 transition-all duration-300 w-full"
                 >
-                  <option value="high">🔴 High</option>
-                  <option value="medium">🟡 Medium</option>
-                  <option value="low">🟢 Low</option>
+                  <option value="high">🔴 Super Important</option>
+                  <option value="medium">🟡 Pretty Important</option>
+                  <option value="low">🟢 When I Have Time</option>
                 </select>
               </div>
+              
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px' }}>
                 <button
                   onClick={handleCloseEditDialog}
@@ -661,11 +717,11 @@ function App() {
                   Cancel
                 </button>
                 <button
-                  onClick={handleUpdateTaskPriority}
+                  onClick={handleUpdateTask}
                   style={buttonStyle}
                   className="bg-blue-500 text-white p-3 rounded-lg font-bold text-lg hover:bg-blue-600 transition-all duration-300"
                 >
-                  Save
+                  Save Changes
                 </button>
               </div>
             </div>
