@@ -65,6 +65,9 @@ function App() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [showScheduleSettings, setShowScheduleSettings] = useState(!isMobile);
   const [showBreakSettings, setShowBreakSettings] = useState(!isMobile);
+  const [currentView, setCurrentView] = useState<'tasks' | 'settings'>('tasks'); // Mobile tab state
+  const [showTaskAddedBubble, setShowTaskAddedBubble] = useState(false); // Task added confirmation
+  const [userHasManuallyReordered, setUserHasManuallyReordered] = useState(false); // Track manual reordering
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -251,14 +254,26 @@ function App() {
     };
 
     const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
-    const sortedTasks = [...currentTasksWithoutBreaks, newTask].sort((a, b) => {
-      const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 };
-      return priorityOrder[a.priority] - priorityOrder[b.priority];
-    });
+    
+    // If user has manually reordered tasks, preserve the order and just append new task
+    let finalTasks;
+    if (userHasManuallyReordered) {
+      finalTasks = [...currentTasksWithoutBreaks, newTask];
+    } else {
+      // Auto-sort by priority only if user hasn't manually reordered
+      finalTasks = [...currentTasksWithoutBreaks, newTask].sort((a, b) => {
+        const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 };
+        return priorityOrder[a.priority] - priorityOrder[b.priority];
+      });
+    }
 
-    setTasks(recalculateSchedule(sortedTasks));
+    setTasks(recalculateSchedule(finalTasks));
     setNewTaskText('');
     setNewTaskPriority('medium');
+    
+    // Show task added confirmation bubble
+    setShowTaskAddedBubble(true);
+    setTimeout(() => setShowTaskAddedBubble(false), 2000);
   };
 
   const handleTaskComplete = (taskId: number) => {
@@ -359,16 +374,20 @@ function App() {
     if (oldIndex !== newIndex) {
       const reorderedTasks = arrayMove(actualTasks, oldIndex, newIndex);
       setTasks(recalculateSchedule(reorderedTasks));
+      // Mark that user has manually reordered tasks
+      setUserHasManuallyReordered(true);
     }
   };
 
   // Inline styles
   const containerStyle = {
-    minHeight: '100vh',
+    minHeight: window.innerWidth < 768 ? '100dvh' : '100vh', // Dynamic viewport height for mobile
     background: 'linear-gradient(135deg, #e0f2fe 0%, #b3e5fc 100%)',
     fontFamily: "'Poppins', 'Comic Sans MS', cursive, sans-serif",
     color: '#334155',
-    padding: window.innerWidth < 768 ? '8px' : '16px'
+    padding: window.innerWidth < 768 ? '8px' : '16px',
+    paddingTop: window.innerWidth < 768 ? 'max(8px, env(safe-area-inset-top))' : '16px',
+    paddingBottom: window.innerWidth < 768 ? 'max(8px, env(safe-area-inset-bottom))' : '16px'
   };
 
   const mainCardStyle = {
@@ -482,15 +501,88 @@ function App() {
           </div>
         )}
 
-        {/* Two Column Layout */}
+        {/* Mobile Tab Navigation */}
+        {isMobile && (
+          <div style={{
+            display: 'flex',
+            background: '#f1f5f9',
+            borderRadius: '12px',
+            padding: '4px',
+            marginBottom: '16px',
+            gap: '4px'
+          }}>
+            <button
+              onClick={() => setCurrentView('tasks')}
+              style={{
+                flex: 1,
+                padding: '12px',
+                borderRadius: '8px',
+                border: 'none',
+                background: currentView === 'tasks' ? '#3b82f6' : 'transparent',
+                color: currentView === 'tasks' ? 'white' : '#64748b',
+                fontWeight: '600',
+                fontSize: '14px',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+            >
+              📅 My Tasks
+            </button>
+            <button
+              onClick={() => setCurrentView('settings')}
+              style={{
+                flex: 1,
+                padding: '12px',
+                borderRadius: '8px',
+                border: 'none',
+                background: currentView === 'settings' ? '#3b82f6' : 'transparent',
+                color: currentView === 'settings' ? 'white' : '#64748b',
+                fontWeight: '600',
+                fontSize: '14px',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+            >
+              ⚙️ Settings
+            </button>
+          </div>
+        )}
+
+        {/* Task Added Confirmation Bubble */}
+        {showTaskAddedBubble && (
+          <div style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            background: '#10b981',
+            color: 'white',
+            padding: '12px 20px',
+            borderRadius: '25px',
+            fontSize: '14px',
+            fontWeight: '600',
+            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)',
+            zIndex: 1000,
+            animation: 'slideInRight 0.3s ease-out',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            ✅ Task added!
+          </div>
+        )}
+
+        {/* Two Column Layout / Mobile Tab Content */}
         <div style={{ 
-          display: 'grid', 
+          display: isMobile ? 'block' : 'grid', 
           gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', 
           gap: isMobile ? '16px' : '32px' 
         }} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
-          {/* Left Column - Task Input */}
-          <div style={columnStyle} className="bg-slate-50 p-6 rounded-lg">
+          {/* Left Column - Task Input / Settings Tab */}
+          <div style={{
+            ...columnStyle,
+            display: isMobile ? (currentView === 'settings' ? 'block' : 'none') : 'block'
+          }} className="bg-slate-50 p-6 rounded-lg">
             <h2 style={{ fontSize: isMobile ? '1.5rem' : '1.875rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }} className="text-3xl font-semibold mb-4">
               {isMobile ? '✨ Add Activity' : '✨ What Cool Thing Will You Do?'}
             </h2>
@@ -741,8 +833,61 @@ function App() {
             </div>
           </div>
 
-          {/* Right Column - Timetable */}
-          <div style={columnStyle} className="bg-slate-50 p-6 rounded-lg">
+          {/* Right Column - Timetable / Tasks Tab */}
+          <div style={{
+            ...columnStyle,
+            display: isMobile ? (currentView === 'tasks' ? 'block' : 'none') : 'block'
+          }} className="bg-slate-50 p-6 rounded-lg">
+            {/* Mobile Task Input Form */}
+            {isMobile && currentView === 'tasks' && (
+              <div style={{ marginBottom: '24px' }}>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }}>
+                  ✨ Add Activity
+                </h2>
+                
+                <form onSubmit={handleAddTask} style={{ display: 'grid', gap: '12px', marginBottom: '20px' }}>
+                  <input
+                    type="text"
+                    placeholder="What will you do? 🤔"
+                    value={newTaskText}
+                    onChange={(e) => setNewTaskText(e.target.value)}
+                    style={{
+                      ...inputStyle,
+                      fontSize: '16px',
+                      padding: '14px'
+                    }}
+                  />
+                  <select
+                    value={newTaskPriority}
+                    onChange={(e) => setNewTaskPriority(e.target.value as 'high' | 'medium' | 'low')}
+                    style={{
+                      ...inputStyle,
+                      fontSize: '16px',
+                      padding: '14px'
+                    }}
+                  >
+                    <option value="medium">🟡 Important</option>
+                    <option value="high">🔴 Very Important</option>
+                    <option value="low">🟢 Later</option>
+                  </select>
+                  <button
+                    type="submit"
+                    style={{
+                      ...buttonStyle,
+                      padding: '14px 24px',
+                      fontSize: '16px',
+                      minHeight: '50px'
+                    }}
+                  >
+                    <PlusCircle size={20} />
+                    <span>Add Activity!</span>
+                  </button>
+                </form>
+                
+                <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '16px', marginBottom: '16px' }} />
+              </div>
+            )}
+
             <h2 style={{ fontSize: isMobile ? '1.5rem' : '1.875rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }} className="text-3xl font-semibold mb-4">
               {isMobile ? '📅 My Schedule' : '📅 My Super Cool Schedule'}
             </h2>
@@ -796,8 +941,8 @@ function App() {
             <div style={{
               position: 'fixed',
               ...(isMobile ? {
-                // Mobile: Center modal
-                top: '50%',
+                // Mobile: Position in upper half to avoid virtual keyboard
+                top: '25%',
                 left: '50%',
                 transform: 'translate(-50%, -50%)',
                 width: '90%',
@@ -917,6 +1062,39 @@ function App() {
             </div>
           </>
         )}
+
+        {/* Footer */}
+        <footer style={{
+          marginTop: '40px',
+          paddingTop: '24px',
+          borderTop: '2px solid #e2e8f0',
+          textAlign: 'center' as const,
+          color: '#64748b',
+          fontSize: isMobile ? '0.875rem' : '1rem'
+        }}>
+          <div style={{ marginBottom: '16px' }}>
+            <span style={{ fontSize: '1.5rem', marginRight: '8px' }}>🌟</span>
+            <strong style={{ color: '#3b82f6' }}>My Day Planner</strong>
+            <span style={{ fontSize: '1.5rem', marginLeft: '8px' }}>🌟</span>
+          </div>
+          <p style={{ margin: '8px 0', fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+            {isMobile ? 
+              'Plan your day, achieve your dreams! 🚀' : 
+              'Helping kids organize their day and achieve their dreams! 🚀'
+            }
+          </p>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            gap: '16px', 
+            marginTop: '12px',
+            fontSize: isMobile ? '0.75rem' : '0.875rem'
+          }}>
+            <span>📚 Study Smart</span>
+            <span>⏰ Manage Time</span>
+            <span>🎯 Reach Goals</span>
+          </div>
+        </footer>
       </div>
     </div>
   );
