@@ -12,7 +12,7 @@ export interface Task {
   priority: 'high' | 'medium' | 'low' | 'break';
   startTime: string;
   endTime: string;
-  emoji?: string; // Optional emoji for the task
+  emoji?: string;
 }
 
 // Helper function to format time
@@ -29,17 +29,13 @@ const getEmojiForTask = (taskText: string): string => {
   if (lowerCaseText.includes('draw') || lowerCaseText.includes('art') || lowerCaseText.includes('paint')) return '🎨';
   if (lowerCaseText.includes('play') || lowerCaseText.includes('game') || lowerCaseText.includes('outside')) return '🎮';
   if (lowerCaseText.includes('walk') || lowerCaseText.includes('dog')) return '🐶';
-  return '⭐'; // Default emoji
+  return '⭐';
 };
 
 function App() {
-  // State to hold the list of tasks
   const [tasks, setTasks] = useState<Task[]>([]);
-  // State to hold the text of the new task being entered
   const [newTaskText, setNewTaskText] = useState('');
-  // State to hold the priority of the new task
   const [newTaskPriority, setNewTaskPriority] = useState<'high' | 'medium' | 'low'>('medium');
-  // State for the edit dialog
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedTaskPriority, setSelectedTaskPriority] = useState<'high' | 'medium' | 'low'>('medium');
@@ -62,7 +58,7 @@ function App() {
     });
 
     let currentTime = new Date();
-    currentTime.setHours(9, 0, 0, 0); // Start at 9:00 AM
+    currentTime.setHours(9, 0, 0, 0);
 
     const finalTasks = tasksWithBreaks.map((task) => {
       const taskDuration = task.priority === 'break' ? 15 : 30;
@@ -80,28 +76,27 @@ function App() {
     return finalTasks;
   };
 
-  // Handle form submission to add a new task
   const handleAddTask = (e: React.FormEvent) => {
-    e.preventDefault(); // Prevent page reload
-    if (newTaskText.trim() === '') return; // Ignore empty tasks
+    e.preventDefault();
+    if (newTaskText.trim() === '') return;
 
     const newTask: Omit<Task, 'startTime' | 'endTime'> = {
-      id: Date.now(), // Use timestamp for a unique ID
+      id: Date.now(),
       text: newTaskText,
       completed: false,
       priority: newTaskPriority,
-      emoji: getEmojiForTask(newTaskText), // Auto-assign emoji
+      emoji: getEmojiForTask(newTaskText),
     };
 
     const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
     const sortedTasks = [...currentTasksWithoutBreaks, newTask].sort((a, b) => {
-      const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 }; // Added break to priorityOrder
+      const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 };
       return priorityOrder[a.priority] - priorityOrder[b.priority];
     });
 
     setTasks(recalculateSchedule(sortedTasks));
-    setNewTaskText(''); // Clear the input field
-    setNewTaskPriority('medium'); // Reset the priority dropdown
+    setNewTaskText('');
+    setNewTaskPriority('medium');
   };
 
   const handleOpenEditDialog = (task: Task) => {
@@ -122,7 +117,7 @@ function App() {
       );
 
       const sortedTasks = updatedTasks.filter(t => t.priority !== 'break').sort((a, b) => {
-        const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 }; // Added break to priorityOrder
+        const priorityOrder = { high: 1, medium: 2, low: 3, break: 4 };
         return priorityOrder[a.priority] - priorityOrder[b.priority];
       });
 
@@ -144,36 +139,119 @@ function App() {
     }
   };
 
+  // Inline styles as fallback
+  const containerStyle = {
+    minHeight: '100vh',
+    background: 'linear-gradient(135deg, #e0f2fe 0%, #b3e5fc 100%)',
+    fontFamily: "'Poppins', 'Comic Sans MS', cursive, sans-serif",
+    color: '#334155',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: '16px'
+  };
+
+  const cardStyle = {
+    background: 'white',
+    borderRadius: '24px',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+    padding: '32px',
+    width: '100%',
+    maxWidth: '672px'
+  };
+
+  const headerStyle = {
+    textAlign: 'center' as const,
+    marginBottom: '32px'
+  };
+
+  const titleStyle = {
+    fontSize: '3rem',
+    fontWeight: 'bold',
+    color: '#2563eb',
+    marginBottom: '8px',
+    textShadow: '2px 2px 4px rgba(0,0,0,0.1)'
+  };
+
+  const subtitleStyle = {
+    fontSize: '1.25rem',
+    color: '#64748b'
+  };
+
+  const inputStyle = {
+    padding: '12px',
+    border: '2px solid #bfdbfe',
+    borderRadius: '8px',
+    fontSize: '16px',
+    outline: 'none',
+    transition: 'all 0.3s ease',
+    width: '100%'
+  };
+
+  const buttonStyle = {
+    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+    color: 'white',
+    padding: '12px 24px',
+    borderRadius: '8px',
+    fontWeight: 'bold',
+    fontSize: '16px',
+    border: 'none',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    transition: 'all 0.3s ease',
+    width: '100%'
+  };
+
   return (
-    <div className="min-h-screen bg-sky-50 font-poppins text-slate-700 flex justify-center items-center p-4">
-      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-2xl">
-        <header className="text-center mb-8">
-          <h1 className="text-5xl font-bold text-blue-600 mb-2">Daily Task Planner</h1>
-          <p className="text-xl text-slate-600">Helping kids organise their day!</p>
+    <div style={containerStyle} className="min-h-screen bg-gradient-to-br from-sky-100 to-blue-200 font-poppins text-slate-700 flex justify-center items-center p-4">
+      <div style={cardStyle} className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-2xl">
+        <header style={headerStyle} className="text-center mb-8">
+          <h1 style={titleStyle} className="text-5xl font-bold text-blue-600 mb-2">
+            🌟 Daily Task Planner 🌟
+          </h1>
+          <p style={subtitleStyle} className="text-xl text-slate-600">
+            Help kids organise their day!
+          </p>
         </header>
 
-        <section className="mb-8">
-          <h2 className="text-3xl font-semibold mb-4">Add a New Task</h2>
-          <form onSubmit={handleAddTask} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <section className="mb-8" style={{ marginBottom: '32px' }}>
+          <h2 className="text-3xl font-semibold mb-4" style={{ fontSize: '1.875rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }}>
+            ✨ Add a New Task
+          </h2>
+          <form onSubmit={handleAddTask} style={{ display: 'grid', gap: '16px' }}>
             <input
               type="text"
-              placeholder="What do you need to do?"
+              placeholder="What do you need to do? 🤔"
               value={newTaskText}
               onChange={(e) => setNewTaskText(e.target.value)}
+              style={inputStyle}
               className="p-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-500 transition-all duration-300"
             />
             <select
               value={newTaskPriority}
               onChange={(e) => setNewTaskPriority(e.target.value as 'high' | 'medium' | 'low')}
+              style={inputStyle}
               className="p-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-500 transition-all duration-300"
             >
-              <option value="medium">Medium Priority</option>
-              <option value="high">High Priority</option>
-              <option value="low">Low Priority</option>
+              <option value="medium">🟡 Medium Priority</option>
+              <option value="high">🔴 High Priority</option>
+              <option value="low">🟢 Low Priority</option>
             </select>
             <button
               type="submit"
-              className="bg-blue-500 text-white p-3 rounded-lg font-bold text-lg flex items-center justify-center space-x-2 hover:bg-blue-600 transition-all duration-300"
+              style={buttonStyle}
+              className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-3 rounded-lg font-bold text-lg flex items-center justify-center space-x-2 hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.05)';
+                e.currentTarget.style.background = 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)';
+              }}
             >
               <PlusCircle size={24} />
               <span>Add Task</span>
@@ -181,45 +259,86 @@ function App() {
           </form>
         </section>
 
-        <section className="bg-slate-50 p-6 rounded-lg">
-          <h2 className="text-3xl font-semibold mb-4">My Timetable</h2>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-              <div>
-                {tasks.map((task, index) => (
-                  <SortableTaskItem key={task.id} task={task} handleOpenEditDialog={handleOpenEditDialog} index={index} />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
+        <section style={{ background: '#f8fafc', padding: '24px', borderRadius: '12px' }} className="bg-slate-50 p-6 rounded-lg">
+          <h2 style={{ fontSize: '1.875rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }} className="text-3xl font-semibold mb-4">
+            📅 My Timetable
+          </h2>
+          {tasks.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+              <div style={{ fontSize: '4rem', marginBottom: '16px' }}>📝</div>
+              <p style={{ fontSize: '1.125rem' }}>No tasks yet! Add your first task above to get started.</p>
+            </div>
+          ) : (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                <div>
+                  {tasks.map((task, index) => (
+                    <SortableTaskItem key={task.id} task={task} handleOpenEditDialog={handleOpenEditDialog} index={index} />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          )}
         </section>
 
         {editDialogOpen && selectedTask && (
-          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center z-50">
-            <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-              <h3 className="text-2xl font-semibold mb-4">Edit Task Priority</h3>
-              <div className="mb-4">
-                <label htmlFor="edit-priority-select" className="block text-lg font-medium text-slate-700 mb-2">Priority</label>
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 50
+          }} className="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center z-50">
+            <div style={{
+              background: 'white',
+              padding: '24px',
+              borderRadius: '12px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+              width: '100%',
+              maxWidth: '400px'
+            }} className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+              <h3 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '16px' }} className="text-2xl font-semibold mb-4">
+                ✏️ Edit Task Priority
+              </h3>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '1.125rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
+                  Priority
+                </label>
                 <select
-                  id="edit-priority-select"
                   value={selectedTaskPriority}
                   onChange={(e) => setSelectedTaskPriority(e.target.value as 'high' | 'medium' | 'low')}
+                  style={inputStyle}
                   className="p-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-500 transition-all duration-300 w-full"
                 >
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
+                  <option value="high">🔴 High</option>
+                  <option value="medium">🟡 Medium</option>
+                  <option value="low">🟢 Low</option>
                 </select>
               </div>
-              <div className="flex justify-end space-x-4">
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px' }}>
                 <button
                   onClick={handleCloseEditDialog}
+                  style={{
+                    background: '#e2e8f0',
+                    color: '#334155',
+                    padding: '12px 24px',
+                    borderRadius: '8px',
+                    fontWeight: 'bold',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
                   className="bg-gray-300 text-slate-700 p-3 rounded-lg font-bold text-lg hover:bg-gray-400 transition-all duration-300"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleUpdateTaskPriority}
+                  style={buttonStyle}
                   className="bg-blue-500 text-white p-3 rounded-lg font-bold text-lg hover:bg-blue-600 transition-all duration-300"
                 >
                   Save
