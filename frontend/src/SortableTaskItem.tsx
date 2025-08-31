@@ -117,7 +117,8 @@ export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplet
       ? '0 2px 4px -1px rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.03)' 
       : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
     display: 'flex',
-    alignItems: 'center',
+    flexDirection: (isMobile ? 'column' : 'row') as 'column' | 'row',
+    alignItems: isMobile ? 'stretch' : 'center',
     justifyContent: 'space-between',
     marginBottom: isMobile ? '8px' : '12px',
     cursor: task.priority === 'break' ? 'default' : 'grab',
@@ -132,12 +133,14 @@ export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplet
     alignItems: 'center',
     gap: isMobile ? '8px' : '12px',
     flex: 1,
-    minWidth: 0
+    minWidth: 0,
+    marginBottom: isMobile ? '8px' : '0'
   };
 
   const rightSectionStyle = {
     display: 'flex',
     alignItems: 'center',
+    justifyContent: isMobile ? 'space-between' : 'flex-end',
     gap: isMobile ? '8px' : '12px',
     flexShrink: 0
   };
@@ -245,7 +248,12 @@ export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplet
             transition: 'all 0.3s ease',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            whiteSpace: isMobile ? 'nowrap' : 'normal'
+            whiteSpace: 'normal',
+            lineHeight: '1.3',
+            maxHeight: isMobile ? '2.6em' : 'none', // Allow 2 lines on mobile
+            display: isMobile ? '-webkit-box' : 'block',
+            WebkitLineClamp: isMobile ? 2 : 'none',
+            WebkitBoxOrient: isMobile ? 'vertical' : 'initial'
           }}>
             {task.text}
           </p>

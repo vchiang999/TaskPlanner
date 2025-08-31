@@ -50,13 +50,29 @@
       }
 
       /* Safe area support for iOS */
-      body {
+      html, body {
+        background: linear-gradient(135deg, #e0f2fe 0%, #b3e5fc 100%);
         padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+        margin: 0;
       }
       
       /* Prevent zoom on input focus for iOS */
       input[type="text"], select, textarea {
         font-size: 16px !important;
+      }
+
+      /* Prevent text selection during drag operations */
+      .dragging {
+        user-select: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+      }
+
+      /* Improve touch interaction */
+      * {
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
       }
     </style>
   </head>

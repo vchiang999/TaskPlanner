@@ -66,7 +66,7 @@ function App() {
   const [showScheduleSettings, setShowScheduleSettings] = useState(!isMobile);
   const [showBreakSettings, setShowBreakSettings] = useState(!isMobile);
   const [currentView, setCurrentView] = useState<'tasks' | 'settings'>('tasks'); // Mobile tab state
-  const [showTaskAddedBubble, setShowTaskAddedBubble] = useState(false); // Task added confirmation
+  const [taskAddedBubbles, setTaskAddedBubbles] = useState<{id: number, text: string}[]>([]); // Task added confirmations
   const [userHasManuallyReordered, setUserHasManuallyReordered] = useState(false); // Track manual reordering
 
   const sensors = useSensors(
@@ -77,8 +77,8 @@ function App() {
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 200,
-        tolerance: 8,
+        delay: 300, // Increased delay to prevent text selection
+        tolerance: 10, // Increased tolerance
       },
     }),
     useSensor(KeyboardSensor, {
@@ -272,8 +272,11 @@ function App() {
     setNewTaskPriority('medium');
     
     // Show task added confirmation bubble
-    setShowTaskAddedBubble(true);
-    setTimeout(() => setShowTaskAddedBubble(false), 2000);
+    const bubbleId = Date.now();
+    setTaskAddedBubbles(prev => [...prev, { id: bubbleId, text: 'Task added!' }]);
+    setTimeout(() => {
+      setTaskAddedBubbles(prev => prev.filter(bubble => bubble.id !== bubbleId));
+    }, 2000);
   };
 
   const handleTaskComplete = (taskId: number) => {
@@ -548,11 +551,11 @@ function App() {
           </div>
         )}
 
-        {/* Task Added Confirmation Bubble */}
-        {showTaskAddedBubble && (
-          <div style={{
+        {/* Task Added Confirmation Bubbles */}
+        {taskAddedBubbles.map((bubble, index) => (
+          <div key={bubble.id} style={{
             position: 'fixed',
-            top: '20px',
+            top: `${20 + (index * 60)}px`, // Stack bubbles vertically
             right: '20px',
             background: '#10b981',
             color: 'white',
@@ -567,9 +570,9 @@ function App() {
             alignItems: 'center',
             gap: '8px'
           }}>
-            ✅ Task added!
+            ✅ {bubble.text}
           </div>
-        )}
+        ))}
 
         {/* Two Column Layout / Mobile Tab Content */}
         <div style={{ 
@@ -583,11 +586,14 @@ function App() {
             ...columnStyle,
             display: isMobile ? (currentView === 'settings' ? 'block' : 'none') : 'block'
           }} className="bg-slate-50 p-6 rounded-lg">
-            <h2 style={{ fontSize: isMobile ? '1.5rem' : '1.875rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }} className="text-3xl font-semibold mb-4">
-              {isMobile ? '✨ Add Activity' : '✨ What Cool Thing Will You Do?'}
-            </h2>
-            
-            <form onSubmit={handleAddTask} style={{ display: 'grid', gap: '16px', marginBottom: '24px' }}>
+            {/* Desktop Task Input Form */}
+            {!isMobile && (
+              <>
+                <h2 style={{ fontSize: '1.875rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }} className="text-3xl font-semibold mb-4">
+                  ✨ What Cool Thing Will You Do?
+                </h2>
+                
+                <form onSubmit={handleAddTask} style={{ display: 'grid', gap: '16px', marginBottom: '24px' }}>
               <input
                 type="text"
                 placeholder={isMobile ? "What will you do? 🤔" : "What awesome thing will you do? 🤔"}
@@ -623,6 +629,15 @@ function App() {
                 <span>{isMobile ? 'Add Activity!' : 'Add to My Awesome Day!'}</span>
               </button>
             </form>
+              </>
+            )}
+
+            {/* Mobile Settings Header */}
+            {isMobile && currentView === 'settings' && (
+              <h2 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }}>
+                ⚙️ Settings
+              </h2>
+            )}
 
             {/* Day Schedule Settings */}
             <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '24px', marginBottom: '24px' }}>
@@ -1078,10 +1093,7 @@ function App() {
             <span style={{ fontSize: '1.5rem', marginLeft: '8px' }}>🌟</span>
           </div>
           <p style={{ margin: '8px 0', fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
-            {isMobile ? 
-              'Plan your day, achieve your dreams! 🚀' : 
-              'Helping kids organize their day and achieve their dreams! 🚀'
-            }
+            Plan your day, achieve your dreams! 🚀
           </p>
           <div style={{ 
             display: 'flex', 
