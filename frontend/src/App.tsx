@@ -124,11 +124,11 @@ function App() {
       // 3. We've completed exactly 'tasksPerBreak' number of tasks
       // 4. There are more tasks remaining after this break
       const tasksCompleted = index + 1;
-      const isFullSet = tasksCompleted % tasksPerBreak === 0;
+      const isFullSet = tasksCompleted % Number(tasksPerBreak) === 0;
       const isNotLastTask = index < actualTasks.length - 1;
       
       if (includeBreaks && isFullSet && isNotLastTask) {
-        const breakIndex = Math.floor(tasksCompleted / tasksPerBreak) - 1;
+        const breakIndex = Math.floor(tasksCompleted / Number(tasksPerBreak)) - 1;
         const breakEmoji = breakEmojis[breakIndex % breakEmojis.length];
         tasksWithBreaks.push({ 
           id: Date.now() + Math.random() * 1000 + index,
@@ -142,10 +142,10 @@ function App() {
 
     // Calculate schedule starting from startHour
     let currentTime = new Date();
-    currentTime.setHours(startHour, 0, 0, 0);
+    currentTime.setHours(Number(startHour), 0, 0, 0);
 
     const finalTasks = tasksWithBreaks.map((task) => {
-      // Ensure we're using the correct duration values
+      // Ensure we're using the correct duration values with proper Number conversion
       const duration = task.priority === 'break' ? Number(breakDuration) : Number(taskDuration);
       const startTime = new Date(currentTime);
       const endTime = new Date(currentTime.getTime() + duration * 60000);
@@ -162,17 +162,74 @@ function App() {
     return finalTasks;
   };
 
+  // Recalculate schedule whenever settings change (but not when tasks change to avoid infinite loop)
+  useEffect(() => {
+    const actualTasks = tasks.filter(t => t.priority !== 'break');
+    if (actualTasks.length > 0) {
+      const tasksWithBreaks: Omit<Task, 'startTime' | 'endTime'>[] = [];
+      const breakEmojis = ['☕', '🎮', '🍎', '🧃', '⚽', '🎨'];
+      
+      // Fixed break insertion logic - only add breaks after completing FULL sets
+      actualTasks.forEach((task, index) => {
+        tasksWithBreaks.push(task);
+        
+        // Only add break if:
+        // 1. We have breaks enabled
+        // 2. This is not the last task
+        // 3. We've completed exactly 'tasksPerBreak' number of tasks
+        // 4. There are more tasks remaining after this break
+        const tasksCompleted = index + 1;
+        const isFullSet = tasksCompleted % Number(tasksPerBreak) === 0;
+        const isNotLastTask = index < actualTasks.length - 1;
+        
+        if (includeBreaks && isFullSet && isNotLastTask) {
+          const breakIndex = Math.floor(tasksCompleted / Number(tasksPerBreak)) - 1;
+          const breakEmoji = breakEmojis[breakIndex % breakEmojis.length];
+          tasksWithBreaks.push({ 
+            id: Date.now() + Math.random() * 1000 + index,
+            text: 'Break Time', 
+            completed: false, 
+            priority: 'break',
+            breakEmoji: breakEmoji
+          });
+        }
+      });
+
+      // Calculate schedule starting from startHour
+      let currentTime = new Date();
+      currentTime.setHours(Number(startHour), 0, 0, 0);
+
+      const finalTasks = tasksWithBreaks.map((task) => {
+        // Ensure we're using the correct duration values with proper Number conversion
+        const duration = task.priority === 'break' ? Number(breakDuration) : Number(taskDuration);
+        const startTime = new Date(currentTime);
+        const endTime = new Date(currentTime.getTime() + duration * 60000);
+
+        currentTime = endTime;
+
+        return {
+          ...task,
+          startTime: formatTime(startTime),
+          endTime: formatTime(endTime),
+        };
+      });
+      
+      setTasks(finalTasks);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskDuration, breakDuration, tasksPerBreak, includeBreaks, startHour, endHour]);
+
   // Check time constraints whenever tasks or settings change
   useEffect(() => {
     const actualTasks = tasks.filter(t => t.priority !== 'break');
     if (actualTasks.length > 0) {
       const numTasks = actualTasks.length;
-      const availableMinutes = (endHour - startHour) * 60;
-      const numBreaks = includeBreaks ? Math.floor((numTasks - 1) / tasksPerBreak) : 0;
-      const totalMinutes = (numTasks * taskDuration) + (numBreaks * breakDuration);
+      const availableMinutes = (Number(endHour) - Number(startHour)) * 60;
+      const numBreaks = includeBreaks ? Math.floor((numTasks - 1) / Number(tasksPerBreak)) : 0;
+      const totalMinutes = (numTasks * Number(taskDuration)) + (numBreaks * Number(breakDuration));
       
       const fits = totalMinutes <= availableMinutes;
-      const suggestedDuration = numTasks > 0 ? roundToNearest10((availableMinutes - (numBreaks * breakDuration)) / numTasks) : taskDuration;
+      const suggestedDuration = numTasks > 0 ? roundToNearest10((availableMinutes - (numBreaks * Number(breakDuration))) / numTasks) : Number(taskDuration);
       
       setShowTimeWarning(!fits);
       setSuggestedTaskDuration(suggestedDuration);
@@ -222,13 +279,16 @@ function App() {
     setSelectedTaskPriority(task.priority as 'high' | 'medium' | 'low');
     setEditTaskText(task.text);
     
-    if (event) {
+    // Only use bubble positioning on desktop, not mobile
+    if (event && !isMobile) {
       // Get the position of the edit button for bubble positioning
       const rect = event.currentTarget.getBoundingClientRect();
       setBubbleEditPosition({
         x: rect.left + rect.width / 2,
         y: rect.top + rect.height + 8
       });
+    } else {
+      setBubbleEditPosition(null);
     }
     
     setEditDialogOpen(true);
@@ -267,11 +327,6 @@ function App() {
   const handleAcceptSuggestedDuration = () => {
     setTaskDuration(suggestedTaskDuration);
     setShowTimeWarning(false);
-    // Immediately recalculate schedule with new duration
-    const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
-    if (currentTasksWithoutBreaks.length > 0) {
-      setTasks(recalculateSchedule(currentTasksWithoutBreaks));
-    }
   };
 
   const handleDragEnd = (event: any) => {
@@ -496,7 +551,7 @@ function App() {
                 {isMobile ? 'Schedule' : 'My Day Schedule'}
                 {isMobile && (
                   <span style={{ marginLeft: 'auto', fontSize: '1rem' }}>
-                    {showScheduleSettings ? '▼' : '▶'}
+                    {showScheduleSettings ? '🔽' : '▶️'}
                   </span>
                 )}
               </h3>
@@ -541,14 +596,7 @@ function App() {
                       </label>
                   <select
                     value={startHour}
-                    onChange={(e) => {
-                      setStartHour(Number(e.target.value));
-                      // Immediately recalculate schedule
-                      const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
-                      if (currentTasksWithoutBreaks.length > 0) {
-                        setTasks(recalculateSchedule(currentTasksWithoutBreaks));
-                      }
-                    }}
+                    onChange={(e) => setStartHour(Number(e.target.value))}
                     style={inputStyle}
                     disabled={isSchoolDay}
                   >
@@ -566,14 +614,7 @@ function App() {
                       </label>
                   <select
                     value={endHour}
-                    onChange={(e) => {
-                      setEndHour(Number(e.target.value));
-                      // Immediately recalculate schedule
-                      const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
-                      if (currentTasksWithoutBreaks.length > 0) {
-                        setTasks(recalculateSchedule(currentTasksWithoutBreaks));
-                      }
-                    }}
+                    onChange={(e) => setEndHour(Number(e.target.value))}
                     style={inputStyle}
                     disabled={isSchoolDay}
                   >
@@ -608,7 +649,7 @@ function App() {
                 {isMobile ? 'Breaks' : 'Fun Break Settings'}
                 {isMobile && (
                   <span style={{ marginLeft: 'auto', fontSize: '1rem' }}>
-                    {showBreakSettings ? '▼' : '▶'}
+                    {showBreakSettings ? '🔽' : '▶️'}
                   </span>
                 )}
               </h3>
@@ -619,14 +660,7 @@ function App() {
                     <input
                       type="checkbox"
                       checked={includeBreaks}
-                      onChange={(e) => {
-                        setIncludeBreaks(e.target.checked);
-                        // Immediately recalculate schedule
-                        const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
-                        if (currentTasksWithoutBreaks.length > 0) {
-                          setTasks(recalculateSchedule(currentTasksWithoutBreaks));
-                        }
-                      }}
+                      onChange={(e) => setIncludeBreaks(e.target.checked)}
                       style={{ width: '20px', height: '20px', accentColor: '#3b82f6' }}
                     />
                     {isMobile ? 'Want breaks?' : 'I want fun breaks!'}
@@ -640,14 +674,7 @@ function App() {
                         </label>
                       <select
                         value={tasksPerBreak}
-                        onChange={(e) => {
-                          setTasksPerBreak(Number(e.target.value));
-                          // Immediately recalculate schedule
-                          const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
-                          if (currentTasksWithoutBreaks.length > 0) {
-                            setTasks(recalculateSchedule(currentTasksWithoutBreaks));
-                          }
-                        }}
+                        onChange={(e) => setTasksPerBreak(Number(e.target.value))}
                         style={inputStyle}
                       >
                         <option value={1}>After every 1 activity</option>
@@ -664,14 +691,7 @@ function App() {
                         </label>
                       <select
                         value={breakDuration}
-                        onChange={(e) => {
-                          setBreakDuration(Number(e.target.value));
-                          // Immediately recalculate schedule
-                          const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
-                          if (currentTasksWithoutBreaks.length > 0) {
-                            setTasks(recalculateSchedule(currentTasksWithoutBreaks));
-                          }
-                        }}
+                        onChange={(e) => setBreakDuration(Number(e.target.value))}
                         style={inputStyle}
                       >
                         <option value={5}>5 minutes</option>
@@ -688,14 +708,7 @@ function App() {
                         </label>
                       <select
                         value={taskDuration}
-                        onChange={(e) => {
-                          setTaskDuration(Number(e.target.value));
-                          // Immediately recalculate schedule
-                          const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
-                          if (currentTasksWithoutBreaks.length > 0) {
-                            setTasks(recalculateSchedule(currentTasksWithoutBreaks));
-                          }
-                        }}
+                        onChange={(e) => setTaskDuration(Number(e.target.value))}
                         style={inputStyle}
                       >
                         <option value={10}>10 minutes</option>
@@ -762,8 +775,8 @@ function App() {
           </div>
         </div>
 
-        {/* Bubble Edit Dialog */}
-        {editDialogOpen && selectedTask && bubbleEditPosition && (
+        {/* Edit Dialog - Bubble for Desktop, Modal for Mobile */}
+        {editDialogOpen && selectedTask && (
           <>
             {/* Backdrop */}
             <div 
@@ -773,40 +786,58 @@ function App() {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                background: 'transparent',
+                background: isMobile ? 'rgba(0, 0, 0, 0.5)' : 'transparent',
                 zIndex: 40
               }}
               onClick={handleCloseEditDialog}
             />
             
-            {/* Bubble Dialog */}
+            {/* Dialog */}
             <div style={{
               position: 'fixed',
-              left: `${bubbleEditPosition.x}px`,
-              top: `${bubbleEditPosition.y}px`,
-              transform: 'translateX(-50%)',
+              ...(isMobile ? {
+                // Mobile: Center modal
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '90%',
+                maxWidth: '400px'
+              } : bubbleEditPosition ? {
+                // Desktop: Bubble positioning
+                left: `${bubbleEditPosition.x}px`,
+                top: `${bubbleEditPosition.y}px`,
+                transform: 'translateX(-50%)',
+                width: '320px'
+              } : {
+                // Fallback: Center modal
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '320px'
+              }),
               background: 'white',
               padding: '20px',
               borderRadius: '16px',
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-              width: '320px',
               zIndex: 50,
               border: '2px solid #e2e8f0',
               animation: 'bubbleIn 0.2s ease-out'
             }}>
-              {/* Arrow pointing up */}
-              <div style={{
-                position: 'absolute',
-                top: '-8px',
-                left: '50%',
-                width: '16px',
-                height: '16px',
-                background: 'white',
-                border: '2px solid #e2e8f0',
-                borderBottom: 'none',
-                borderRight: 'none',
-                transform: 'translateX(-50%) rotate(45deg)'
-              }} />
+              {/* Arrow pointing up - only for desktop bubble */}
+              {!isMobile && bubbleEditPosition && (
+                <div style={{
+                  position: 'absolute',
+                  top: '-8px',
+                  left: '50%',
+                  width: '16px',
+                  height: '16px',
+                  background: 'white',
+                  border: '2px solid #e2e8f0',
+                  borderBottom: 'none',
+                  borderRight: 'none',
+                  transform: 'translateX(-50%) rotate(45deg)'
+                }} />
+              )}
               
               <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }}>
                 ✏️ Edit Activity
@@ -843,9 +874,9 @@ function App() {
                     padding: '8px 12px'
                   }}
                 >
-                  <option value="high">🔴 Super Important</option>
-                  <option value="medium">🟡 Pretty Important</option>
-                  <option value="low">🟢 When I Have Time</option>
+                  <option value="high">{isMobile ? '🔴 Very Important' : '🔴 Super Important'}</option>
+                  <option value="medium">{isMobile ? '🟡 Important' : '🟡 Pretty Important'}</option>
+                  <option value="low">{isMobile ? '🟢 Later' : '🟢 When I Have Time'}</option>
                 </select>
               </div>
               
@@ -855,12 +886,13 @@ function App() {
                   style={{
                     background: '#f1f5f9',
                     color: '#64748b',
-                    padding: '8px 16px',
+                    padding: isMobile ? '12px 20px' : '8px 16px',
                     borderRadius: '6px',
                     fontSize: '14px',
                     fontWeight: '500',
                     border: 'none',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    minHeight: isMobile ? '44px' : 'auto'
                   }}
                 >
                   Cancel
@@ -870,12 +902,13 @@ function App() {
                   style={{
                     background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
                     color: 'white',
-                    padding: '8px 16px',
+                    padding: isMobile ? '12px 20px' : '8px 16px',
                     borderRadius: '6px',
                     fontSize: '14px',
                     fontWeight: '500',
                     border: 'none',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    minHeight: isMobile ? '44px' : 'auto'
                   }}
                 >
                   Save
