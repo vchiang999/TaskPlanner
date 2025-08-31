@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTaskItem } from './SortableTaskItem';
-import { PlusCircle, Settings } from 'lucide-react';
+import { PlusCircle, Settings, Clock, AlertTriangle } from 'lucide-react';
 
 // A simple interface to define the shape of a task object
 export interface Task {
@@ -33,6 +33,8 @@ const getEmojiForTask = (taskText: string): string => {
   return '⭐';
 };
 
+
+
 function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskText, setNewTaskText] = useState('');
@@ -41,20 +43,27 @@ function App() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedTaskPriority, setSelectedTaskPriority] = useState<'high' | 'medium' | 'low'>('medium');
   
-  // New break time settings
+  // Break time and schedule settings
   const [includeBreaks, setIncludeBreaks] = useState(true);
-  const [breakDuration, setBreakDuration] = useState(15); // minutes
-  const [taskDuration, setTaskDuration] = useState(30); // minutes
+  const [breakDuration, setBreakDuration] = useState(10); // Changed default to 10 minutes
+  const [taskDuration, setTaskDuration] = useState(30);
+  const [tasksPerBreak, setTasksPerBreak] = useState(2); // New: tasks before each break
+  const [startHour, setStartHour] = useState(9); // Start of day
+  const [endHour, setEndHour] = useState(16); // End of day (4 PM)
+  
+  // Warning states
+  const [showTimeWarning, setShowTimeWarning] = useState(false);
+  const [suggestedTaskDuration, setSuggestedTaskDuration] = useState(30);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8, // Require 8px of movement before drag starts
+        distance: 8,
       },
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 200, // 200ms delay before drag starts on touch
+        delay: 200,
         tolerance: 8,
       },
     }),
@@ -63,19 +72,42 @@ function App() {
     })
   );
 
+  // Calculate if tasks fit within time frame
+  const calculateTimeRequirements = (taskList: Omit<Task, 'startTime' | 'endTime'>[]) => {
+    const actualTasks = taskList.filter(t => t.priority !== 'break');
+    const numTasks = actualTasks.length;
+    
+    if (numTasks === 0) return { fits: true, totalMinutes: 0, availableMinutes: 0 };
+    
+    const availableMinutes = (endHour - startHour) * 60;
+    const numBreaks = includeBreaks ? Math.floor((numTasks - 1) / tasksPerBreak) : 0;
+    const totalMinutes = (numTasks * taskDuration) + (numBreaks * breakDuration);
+    
+    return {
+      fits: totalMinutes <= availableMinutes,
+      totalMinutes,
+      availableMinutes,
+      suggestedDuration: numTasks > 0 ? Math.floor((availableMinutes - (numBreaks * breakDuration)) / numTasks) : taskDuration
+    };
+  };
+
   const recalculateSchedule = (currentTasks: Omit<Task, 'startTime' | 'endTime'>[]) => {
+    const actualTasks = currentTasks.filter(t => t.priority !== 'break');
     const tasksWithBreaks: Omit<Task, 'startTime' | 'endTime'>[] = [];
     const breakEmojis = ['☕', '🎮', '🍎', '🧃', '⚽', '🎨'];
     
-    currentTasks.forEach((task, index) => {
+    // Add tasks and breaks based on tasksPerBreak setting
+    actualTasks.forEach((task, index) => {
       tasksWithBreaks.push(task);
       
-      // Add breaks based on settings
-      if (includeBreaks && index < currentTasks.length - 1) {
-        // Create unique break with consistent emoji
-        const breakEmoji = breakEmojis[index % breakEmojis.length];
+      // Add break after every 'tasksPerBreak' tasks (but not after the last task)
+      if (includeBreaks && 
+          index < actualTasks.length - 1 && 
+          (index + 1) % tasksPerBreak === 0) {
+        const breakIndex = Math.floor(index / tasksPerBreak);
+        const breakEmoji = breakEmojis[breakIndex % breakEmojis.length];
         tasksWithBreaks.push({ 
-          id: Date.now() + Math.random() * 1000 + index, // More unique ID
+          id: Date.now() + Math.random() * 1000 + index,
           text: 'Break Time', 
           completed: false, 
           priority: 'break',
@@ -84,11 +116,11 @@ function App() {
       }
     });
 
-    // Ensure at least one break if there are multiple tasks
-    if (includeBreaks && currentTasks.length > 1 && tasksWithBreaks.filter(t => t.priority === 'break').length === 0) {
-      // Add a break after the first task
+    // Ensure at least one break if there are multiple tasks and no breaks were added
+    if (includeBreaks && actualTasks.length > 1 && tasksWithBreaks.filter(t => t.priority === 'break').length === 0) {
       const breakEmoji = breakEmojis[0];
-      tasksWithBreaks.splice(1, 0, {
+      const insertIndex = Math.min(tasksPerBreak, actualTasks.length - 1);
+      tasksWithBreaks.splice(insertIndex, 0, {
         id: Date.now() + Math.random() * 1000,
         text: 'Break Time',
         completed: false,
@@ -97,8 +129,9 @@ function App() {
       });
     }
 
+    // Calculate schedule starting from startHour
     let currentTime = new Date();
-    currentTime.setHours(9, 0, 0, 0);
+    currentTime.setHours(startHour, 0, 0, 0);
 
     const finalTasks = tasksWithBreaks.map((task) => {
       const duration = task.priority === 'break' ? breakDuration : taskDuration;
@@ -113,8 +146,21 @@ function App() {
         endTime: formatTime(endTime),
       };
     });
+    
     return finalTasks;
   };
+
+  // Check time constraints whenever tasks or settings change
+  useEffect(() => {
+    const actualTasks = tasks.filter(t => t.priority !== 'break');
+    if (actualTasks.length > 0) {
+      const timeCheck = calculateTimeRequirements(actualTasks);
+      setShowTimeWarning(!timeCheck.fits);
+      setSuggestedTaskDuration(timeCheck.suggestedDuration || taskDuration);
+    } else {
+      setShowTimeWarning(false);
+    }
+  }, [tasks, taskDuration, breakDuration, tasksPerBreak, includeBreaks, startHour, endHour]);
 
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,12 +220,19 @@ function App() {
     }
   };
 
-  const handleBreakSettingsChange = () => {
-    // Recalculate schedule when break settings change
+  const handleSettingsChange = () => {
+    // Immediately recalculate schedule when settings change
     const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
     if (currentTasksWithoutBreaks.length > 0) {
       setTasks(recalculateSchedule(currentTasksWithoutBreaks));
     }
+  };
+
+  const handleAcceptSuggestedDuration = () => {
+    setTaskDuration(suggestedTaskDuration);
+    setShowTimeWarning(false);
+    // Trigger recalculation
+    setTimeout(handleSettingsChange, 0);
   };
 
   const handleDragEnd = (event: any) => {
@@ -187,11 +240,9 @@ function App() {
 
     if (!over || active.id === over.id) return;
 
-    // Only allow dragging of non-break tasks
     const activeTask = tasks.find(task => task.id === active.id);
     if (!activeTask || activeTask.priority === 'break') return;
 
-    // Get only the actual tasks (no breaks) and reorder them
     const actualTasks = tasks.filter(task => task.priority !== 'break');
     const oldIndex = actualTasks.findIndex((task) => task.id === active.id);
     const overTask = tasks.find(task => task.id === over.id);
@@ -200,7 +251,6 @@ function App() {
 
     let newIndex;
     if (overTask.priority === 'break') {
-      // If dropping on a break, find the adjacent task
       const overTaskIndex = tasks.findIndex(task => task.id === over.id);
       const nextTask = tasks[overTaskIndex + 1];
       if (nextTask && nextTask.priority !== 'break') {
@@ -218,7 +268,7 @@ function App() {
     }
   };
 
-  // Inline styles as fallback
+  // Inline styles
   const containerStyle = {
     minHeight: '100vh',
     background: 'linear-gradient(135deg, #e0f2fe 0%, #b3e5fc 100%)',
@@ -289,6 +339,15 @@ function App() {
     height: 'fit-content'
   };
 
+  const warningStyle = {
+    background: '#fef3c7',
+    border: '2px solid #f59e0b',
+    borderRadius: '8px',
+    padding: '16px',
+    marginBottom: '16px',
+    color: '#92400e'
+  };
+
   return (
     <div style={containerStyle} className="min-h-screen bg-gradient-to-br from-sky-100 to-blue-200 font-poppins text-slate-700 p-4">
       <div style={mainCardStyle} className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-6xl mx-auto">
@@ -300,6 +359,34 @@ function App() {
             Help kids organise their day!
           </p>
         </header>
+
+        {/* Time Warning */}
+        {showTimeWarning && (
+          <div style={warningStyle}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <AlertTriangle size={20} />
+              <strong>Too many tasks for the day!</strong>
+            </div>
+            <p style={{ margin: '8px 0' }}>
+              Your tasks won't fit between {startHour}:00 and {endHour}:00. 
+              Suggested task duration: {suggestedTaskDuration} minutes.
+            </p>
+            <button
+              onClick={handleAcceptSuggestedDuration}
+              style={{
+                background: '#f59e0b',
+                color: 'white',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: 'bold'
+              }}
+            >
+              Auto-adjust task duration
+            </button>
+          </div>
+        )}
 
         {/* Two Column Layout */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -347,6 +434,56 @@ function App() {
               </button>
             </form>
 
+            {/* Day Schedule Settings */}
+            <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '24px', marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Clock size={24} />
+                Day Schedule
+              </h3>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '1rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
+                    Start of day
+                  </label>
+                  <select
+                    value={startHour}
+                    onChange={(e) => {
+                      setStartHour(Number(e.target.value));
+                      setTimeout(handleSettingsChange, 0);
+                    }}
+                    style={inputStyle}
+                  >
+                    {Array.from({ length: 12 }, (_, i) => i + 6).map(hour => (
+                      <option key={hour} value={hour}>
+                        {hour}:00 {hour < 12 ? 'AM' : 'PM'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '1rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
+                    End of day
+                  </label>
+                  <select
+                    value={endHour}
+                    onChange={(e) => {
+                      setEndHour(Number(e.target.value));
+                      setTimeout(handleSettingsChange, 0);
+                    }}
+                    style={inputStyle}
+                  >
+                    {Array.from({ length: 12 }, (_, i) => i + 12).map(hour => (
+                      <option key={hour} value={hour}>
+                        {hour > 12 ? hour - 12 : hour}:00 {hour < 12 ? 'AM' : 'PM'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
             {/* Break Time Settings */}
             <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '24px' }}>
               <h3 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -361,7 +498,7 @@ function App() {
                     checked={includeBreaks}
                     onChange={(e) => {
                       setIncludeBreaks(e.target.checked);
-                      setTimeout(handleBreakSettingsChange, 0);
+                      setTimeout(handleSettingsChange, 0);
                     }}
                     style={{ width: '20px', height: '20px', accentColor: '#3b82f6' }}
                   />
@@ -372,13 +509,33 @@ function App() {
                   <>
                     <div>
                       <label style={{ display: 'block', fontSize: '1rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
+                        Tasks before each break
+                      </label>
+                      <select
+                        value={tasksPerBreak}
+                        onChange={(e) => {
+                          setTasksPerBreak(Number(e.target.value));
+                          setTimeout(handleSettingsChange, 0);
+                        }}
+                        style={inputStyle}
+                      >
+                        <option value={1}>1 task</option>
+                        <option value={2}>2 tasks</option>
+                        <option value={3}>3 tasks</option>
+                        <option value={4}>4 tasks</option>
+                        <option value={5}>5 tasks</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '1rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
                         Break duration (minutes)
                       </label>
                       <select
                         value={breakDuration}
                         onChange={(e) => {
                           setBreakDuration(Number(e.target.value));
-                          setTimeout(handleBreakSettingsChange, 0);
+                          setTimeout(handleSettingsChange, 0);
                         }}
                         style={inputStyle}
                       >
@@ -398,7 +555,7 @@ function App() {
                         value={taskDuration}
                         onChange={(e) => {
                           setTaskDuration(Number(e.target.value));
-                          setTimeout(handleBreakSettingsChange, 0);
+                          setTimeout(handleSettingsChange, 0);
                         }}
                         style={inputStyle}
                       >
@@ -420,7 +577,7 @@ function App() {
                   color: '#1e40af',
                   border: '1px solid #93c5fd'
                 }}>
-                  💡 <strong>Tip:</strong> At least one break time will be added if you have multiple tasks to help you rest!
+                  💡 <strong>Tip:</strong> Breaks will be added after every {tasksPerBreak} task{tasksPerBreak > 1 ? 's' : ''} to help you rest!
                 </div>
               </div>
             </div>

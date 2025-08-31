@@ -45,15 +45,15 @@ export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplet
     switch (priority) {
       case 'high':
         return {
-          background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-          borderLeft: '6px solid #f59e0b',
-          color: '#92400e'
+          background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+          borderLeft: '6px solid #dc2626',
+          color: '#991b1b'
         };
       case 'medium':
         return {
-          background: 'linear-gradient(135deg, #ccfbf1 0%, #99f6e4 100%)',
-          borderLeft: '6px solid #14b8a6',
-          color: '#0f766e'
+          background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+          borderLeft: '6px solid #f59e0b',
+          color: '#92400e'
         };
       case 'low':
         return {
@@ -63,9 +63,9 @@ export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplet
         };
       case 'break':
         return {
-          background: 'linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%)',
-          borderLeft: '6px solid #ec4899',
-          color: '#be185d'
+          background: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
+          borderLeft: '6px solid #6b7280',
+          color: '#374151'
         };
       default:
         return {
@@ -73,6 +73,16 @@ export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplet
           borderLeft: '6px solid #64748b',
           color: '#334155'
         };
+    }
+  };
+
+  // Function to get priority emoji dot
+  const getPriorityEmoji = (priority: 'high' | 'medium' | 'low'): string => {
+    switch (priority) {
+      case 'high': return '🔴';
+      case 'medium': return '🟡';
+      case 'low': return '🟢';
+      default: return '⭐';
     }
   };
 
@@ -180,15 +190,29 @@ export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplet
             />
           )}
           
-          {task.priority !== 'break' && task.emoji && (
-            <span style={{ 
-              fontSize: '2rem', 
-              filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.1))',
-              opacity: task.completed ? 0.5 : 1,
-              transition: 'opacity 0.3s ease'
-            }}>
-              {task.emoji}
-            </span>
+          {task.priority !== 'break' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {/* Priority emoji dot */}
+              <span style={{ 
+                fontSize: '1.5rem',
+                opacity: task.completed ? 0.5 : 1,
+                transition: 'opacity 0.3s ease'
+              }}>
+                {getPriorityEmoji(task.priority as 'high' | 'medium' | 'low')}
+              </span>
+              
+              {/* Task emoji */}
+              {task.emoji && (
+                <span style={{ 
+                  fontSize: '2rem', 
+                  filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.1))',
+                  opacity: task.completed ? 0.5 : 1,
+                  transition: 'opacity 0.3s ease'
+                }}>
+                  {task.emoji}
+                </span>
+              )}
+            </div>
           )}
           {task.priority === 'break' && (
             <span style={{ fontSize: '2rem', color: priorityStyles.color }}>
