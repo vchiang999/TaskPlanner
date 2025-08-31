@@ -72,24 +72,7 @@ function App() {
     })
   );
 
-  // Calculate if tasks fit within time frame
-  const calculateTimeRequirements = (taskList: Omit<Task, 'startTime' | 'endTime'>[]) => {
-    const actualTasks = taskList.filter(t => t.priority !== 'break');
-    const numTasks = actualTasks.length;
-    
-    if (numTasks === 0) return { fits: true, totalMinutes: 0, availableMinutes: 0 };
-    
-    const availableMinutes = (endHour - startHour) * 60;
-    const numBreaks = includeBreaks ? Math.floor((numTasks - 1) / tasksPerBreak) : 0;
-    const totalMinutes = (numTasks * taskDuration) + (numBreaks * breakDuration);
-    
-    return {
-      fits: totalMinutes <= availableMinutes,
-      totalMinutes,
-      availableMinutes,
-      suggestedDuration: numTasks > 0 ? Math.floor((availableMinutes - (numBreaks * breakDuration)) / numTasks) : taskDuration
-    };
-  };
+
 
   const recalculateSchedule = (currentTasks: Omit<Task, 'startTime' | 'endTime'>[]) => {
     const actualTasks = currentTasks.filter(t => t.priority !== 'break');
@@ -154,9 +137,17 @@ function App() {
   useEffect(() => {
     const actualTasks = tasks.filter(t => t.priority !== 'break');
     if (actualTasks.length > 0) {
-      const timeCheck = calculateTimeRequirements(actualTasks);
-      setShowTimeWarning(!timeCheck.fits);
-      setSuggestedTaskDuration(timeCheck.suggestedDuration || taskDuration);
+      // Calculate time requirements inline to avoid dependency issues
+      const numTasks = actualTasks.length;
+      const availableMinutes = (endHour - startHour) * 60;
+      const numBreaks = includeBreaks ? Math.floor((numTasks - 1) / tasksPerBreak) : 0;
+      const totalMinutes = (numTasks * taskDuration) + (numBreaks * breakDuration);
+      
+      const fits = totalMinutes <= availableMinutes;
+      const suggestedDuration = numTasks > 0 ? Math.floor((availableMinutes - (numBreaks * breakDuration)) / numTasks) : taskDuration;
+      
+      setShowTimeWarning(!fits);
+      setSuggestedTaskDuration(suggestedDuration);
     } else {
       setShowTimeWarning(false);
     }
