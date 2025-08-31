@@ -46,10 +46,11 @@ function App() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedTaskPriority, setSelectedTaskPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [editTaskText, setEditTaskText] = useState('');
+  const [bubbleEditPosition, setBubbleEditPosition] = useState<{x: number, y: number} | null>(null);
   
   // Break time and schedule settings
   const [includeBreaks, setIncludeBreaks] = useState(true);
-  const [breakDuration, setBreakDuration] = useState(10);
+  const [breakDuration, setBreakDuration] = useState(10); // Default to 10 minutes
   const [taskDuration, setTaskDuration] = useState(30);
   const [tasksPerBreak, setTasksPerBreak] = useState(2);
   const [startHour, setStartHour] = useState(9);
@@ -59,6 +60,11 @@ function App() {
   // Warning states
   const [showTimeWarning, setShowTimeWarning] = useState(false);
   const [suggestedTaskDuration, setSuggestedTaskDuration] = useState(30);
+  
+  // Mobile UI states
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [showScheduleSettings, setShowScheduleSettings] = useState(!isMobile);
+  const [showBreakSettings, setShowBreakSettings] = useState(!isMobile);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -88,20 +94,41 @@ function App() {
     }
   }, [isSchoolDay]);
 
+  // Handle window resize for mobile responsiveness
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) {
+        setShowScheduleSettings(true);
+        setShowBreakSettings(true);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const recalculateSchedule = (currentTasks: Omit<Task, 'startTime' | 'endTime'>[]) => {
     const actualTasks = currentTasks.filter(t => t.priority !== 'break');
     const tasksWithBreaks: Omit<Task, 'startTime' | 'endTime'>[] = [];
     const breakEmojis = ['☕', '🎮', '🍎', '🧃', '⚽', '🎨'];
     
-    // Fixed break insertion logic
+    // Fixed break insertion logic - only add breaks after completing FULL sets
     actualTasks.forEach((task, index) => {
       tasksWithBreaks.push(task);
       
-      // Add break after every 'tasksPerBreak' tasks (but not after the last task)
-      if (includeBreaks && 
-          index < actualTasks.length - 1 && 
-          (index + 1) % tasksPerBreak === 0) {
-        const breakIndex = Math.floor(index / tasksPerBreak);
+      // Only add break if:
+      // 1. We have breaks enabled
+      // 2. This is not the last task
+      // 3. We've completed exactly 'tasksPerBreak' number of tasks
+      // 4. There are more tasks remaining after this break
+      const tasksCompleted = index + 1;
+      const isFullSet = tasksCompleted % tasksPerBreak === 0;
+      const isNotLastTask = index < actualTasks.length - 1;
+      
+      if (includeBreaks && isFullSet && isNotLastTask) {
+        const breakIndex = Math.floor(tasksCompleted / tasksPerBreak) - 1;
         const breakEmoji = breakEmojis[breakIndex % breakEmojis.length];
         tasksWithBreaks.push({ 
           id: Date.now() + Math.random() * 1000 + index,
@@ -118,7 +145,8 @@ function App() {
     currentTime.setHours(startHour, 0, 0, 0);
 
     const finalTasks = tasksWithBreaks.map((task) => {
-      const duration = task.priority === 'break' ? breakDuration : taskDuration;
+      // Ensure we're using the correct duration values
+      const duration = task.priority === 'break' ? Number(breakDuration) : Number(taskDuration);
       const startTime = new Date(currentTime);
       const endTime = new Date(currentTime.getTime() + duration * 60000);
 
@@ -189,10 +217,20 @@ function App() {
     setTasks(recalculateSchedule(currentTasksWithoutBreaks));
   };
 
-  const handleOpenEditDialog = (task: Task) => {
+  const handleOpenEditDialog = (task: Task, event?: React.MouseEvent) => {
     setSelectedTask(task);
     setSelectedTaskPriority(task.priority as 'high' | 'medium' | 'low');
     setEditTaskText(task.text);
+    
+    if (event) {
+      // Get the position of the edit button for bubble positioning
+      const rect = event.currentTarget.getBoundingClientRect();
+      setBubbleEditPosition({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height + 8
+      });
+    }
+    
     setEditDialogOpen(true);
   };
 
@@ -200,6 +238,7 @@ function App() {
     setEditDialogOpen(false);
     setSelectedTask(null);
     setEditTaskText('');
+    setBubbleEditPosition(null);
   };
 
   const handleUpdateTask = () => {
@@ -223,17 +262,16 @@ function App() {
     }
   };
 
-  const handleSettingsChange = () => {
-    const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
-    if (currentTasksWithoutBreaks.length > 0) {
-      setTasks(recalculateSchedule(currentTasksWithoutBreaks));
-    }
-  };
+
 
   const handleAcceptSuggestedDuration = () => {
     setTaskDuration(suggestedTaskDuration);
     setShowTimeWarning(false);
-    setTimeout(handleSettingsChange, 0);
+    // Immediately recalculate schedule with new duration
+    const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
+    if (currentTasksWithoutBreaks.length > 0) {
+      setTasks(recalculateSchedule(currentTasksWithoutBreaks));
+    }
   };
 
   const handleDragEnd = (event: any) => {
@@ -275,14 +313,14 @@ function App() {
     background: 'linear-gradient(135deg, #e0f2fe 0%, #b3e5fc 100%)',
     fontFamily: "'Poppins', 'Comic Sans MS', cursive, sans-serif",
     color: '#334155',
-    padding: '16px'
+    padding: window.innerWidth < 768 ? '8px' : '16px'
   };
 
   const mainCardStyle = {
     background: 'white',
-    borderRadius: '24px',
+    borderRadius: window.innerWidth < 768 ? '16px' : '24px',
     boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-    padding: '32px',
+    padding: window.innerWidth < 768 ? '16px' : '32px',
     width: '100%',
     maxWidth: '1200px',
     margin: '0 auto'
@@ -294,7 +332,7 @@ function App() {
   };
 
   const titleStyle = {
-    fontSize: '3rem',
+    fontSize: window.innerWidth < 768 ? '2rem' : '3rem',
     fontWeight: 'bold',
     color: '#2563eb',
     marginBottom: '8px',
@@ -302,7 +340,7 @@ function App() {
   };
 
   const subtitleStyle = {
-    fontSize: '1.25rem',
+    fontSize: window.innerWidth < 768 ? '1rem' : '1.25rem',
     color: '#64748b'
   };
 
@@ -335,7 +373,7 @@ function App() {
 
   const columnStyle = {
     background: '#f8fafc',
-    padding: '24px',
+    padding: window.innerWidth < 768 ? '16px' : '24px',
     borderRadius: '12px',
     height: 'fit-content'
   };
@@ -354,10 +392,10 @@ function App() {
       <div style={mainCardStyle} className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-6xl mx-auto">
         <header style={headerStyle} className="text-center mb-8">
           <h1 style={titleStyle} className="text-5xl font-bold text-blue-600 mb-2">
-            🌟 My Daily Adventure Planner 🌟
+            {isMobile ? '🌟 My Day Planner 🌟' : '🌟 My Super Cool Day Planner 🌟'}
           </h1>
           <p style={subtitleStyle} className="text-xl text-slate-600">
-            Plan your awesome day and make it amazing!
+            {isMobile ? 'Plan your awesome day!' : 'Let\'s make today absolutely amazing together!'}
           </p>
         </header>
 
@@ -390,18 +428,22 @@ function App() {
         )}
 
         {/* Two Column Layout */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', 
+          gap: isMobile ? '16px' : '32px' 
+        }} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
           {/* Left Column - Task Input */}
           <div style={columnStyle} className="bg-slate-50 p-6 rounded-lg">
-            <h2 style={{ fontSize: '1.875rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }} className="text-3xl font-semibold mb-4">
-              ✨ What's Your Next Adventure?
+            <h2 style={{ fontSize: isMobile ? '1.5rem' : '1.875rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }} className="text-3xl font-semibold mb-4">
+              {isMobile ? '✨ Add Activity' : '✨ What Cool Thing Will You Do?'}
             </h2>
             
             <form onSubmit={handleAddTask} style={{ display: 'grid', gap: '16px', marginBottom: '24px' }}>
               <input
                 type="text"
-                placeholder="What fun thing will you do? 🤔"
+                placeholder={isMobile ? "What will you do? 🤔" : "What awesome thing will you do? 🤔"}
                 value={newTaskText}
                 onChange={(e) => setNewTaskText(e.target.value)}
                 style={inputStyle}
@@ -413,9 +455,9 @@ function App() {
                 style={inputStyle}
                 className="p-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-500 transition-all duration-300"
               >
-                <option value="medium">🟡 Pretty Important</option>
-                <option value="high">🔴 Super Important</option>
-                <option value="low">🟢 When I Have Time</option>
+                <option value="medium">{isMobile ? '🟡 Important' : '🟡 Pretty Important'}</option>
+                <option value="high">{isMobile ? '🔴 Very Important' : '🔴 Super Important'}</option>
+                <option value="low">{isMobile ? '🟢 Later' : '🟢 When I Have Time'}</option>
               </select>
               <button
                 type="submit"
@@ -431,53 +473,81 @@ function App() {
                 }}
               >
                 <PlusCircle size={24} />
-                <span>Add to My Day!</span>
+                <span>{isMobile ? 'Add Activity!' : 'Add to My Awesome Day!'}</span>
               </button>
             </form>
 
-            {/* School Day Toggle */}
-            <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '24px', marginBottom: '24px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.125rem', fontWeight: '500', marginBottom: '16px' }}>
-                <input
-                  type="checkbox"
-                  checked={isSchoolDay}
-                  onChange={(e) => setIsSchoolDay(e.target.checked)}
-                  style={{ width: '20px', height: '20px', accentColor: '#3b82f6' }}
-                />
-                <GraduationCap size={24} />
-                Is this a school day?
-              </label>
-              <div style={{ 
-                background: '#dbeafe', 
-                padding: '12px', 
-                borderRadius: '8px', 
-                fontSize: '0.875rem', 
-                color: '#1e40af',
-                border: '1px solid #93c5fd'
-              }}>
-                📚 <strong>School day:</strong> Plan activities from 4 PM to 6 PM (after school!)
-                <br />
-                🏠 <strong>Free day:</strong> Plan activities from 9 AM to 4 PM (whole day fun!)
-              </div>
-            </div>
-
             {/* Day Schedule Settings */}
             <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '24px', marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Clock size={24} />
-                My Day Schedule
+              <h3 
+                style={{ 
+                  fontSize: isMobile ? '1.25rem' : '1.5rem', 
+                  fontWeight: '600', 
+                  marginBottom: '16px', 
+                  color: '#1e293b', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px',
+                  cursor: isMobile ? 'pointer' : 'default'
+                }}
+                onClick={() => isMobile && setShowScheduleSettings(!showScheduleSettings)}
+              >
+                <Clock size={isMobile ? 20 : 24} />
+                {isMobile ? 'Schedule' : 'My Day Schedule'}
+                {isMobile && (
+                  <span style={{ marginLeft: 'auto', fontSize: '1rem' }}>
+                    {showScheduleSettings ? '▼' : '▶'}
+                  </span>
+                )}
               </h3>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '1rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
-                    Start my day at
+              {/* School Day Toggle */}
+              {showScheduleSettings && (
+                <>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: isMobile ? '1rem' : '1.125rem', fontWeight: '500', marginBottom: '16px' }}>
+                    <input
+                      type="checkbox"
+                      checked={isSchoolDay}
+                      onChange={(e) => setIsSchoolDay(e.target.checked)}
+                      style={{ width: '20px', height: '20px', accentColor: '#3b82f6' }}
+                    />
+                    <GraduationCap size={isMobile ? 20 : 24} />
+                    {isMobile ? 'School day?' : 'Is this a school day?'}
                   </label>
+                  <div style={{ 
+                    background: '#dbeafe', 
+                    padding: isMobile ? '8px' : '12px', 
+                    borderRadius: '8px', 
+                    fontSize: isMobile ? '0.75rem' : '0.875rem', 
+                    color: '#1e40af',
+                    border: '1px solid #93c5fd',
+                    marginBottom: '16px'
+                  }}>
+                    {isMobile ? (
+                      <>📚 School: 4-6 PM<br />🏠 Free: 9 AM-4 PM</>
+                    ) : (
+                      <>
+                        📚 <strong>School day:</strong> Plan activities from 4 PM to 6 PM (after school!)
+                        <br />
+                        🏠 <strong>Free day:</strong> Plan activities from 9 AM to 4 PM (whole day fun!)
+                      </>
+                    )}
+                  </div>
+              
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: isMobile ? '0.875rem' : '1rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
+                        {isMobile ? 'Start' : 'Start my day at'}
+                      </label>
                   <select
                     value={startHour}
                     onChange={(e) => {
                       setStartHour(Number(e.target.value));
-                      setTimeout(handleSettingsChange, 0);
+                      // Immediately recalculate schedule
+                      const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
+                      if (currentTasksWithoutBreaks.length > 0) {
+                        setTasks(recalculateSchedule(currentTasksWithoutBreaks));
+                      }
                     }}
                     style={inputStyle}
                     disabled={isSchoolDay}
@@ -490,15 +560,19 @@ function App() {
                   </select>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '1rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
-                    Finish my day at
-                  </label>
+                    <div>
+                      <label style={{ display: 'block', fontSize: isMobile ? '0.875rem' : '1rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
+                        {isMobile ? 'End' : 'Finish my day at'}
+                      </label>
                   <select
                     value={endHour}
                     onChange={(e) => {
                       setEndHour(Number(e.target.value));
-                      setTimeout(handleSettingsChange, 0);
+                      // Immediately recalculate schedule
+                      const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
+                      if (currentTasksWithoutBreaks.length > 0) {
+                        setTasks(recalculateSchedule(currentTasksWithoutBreaks));
+                      }
                     }}
                     style={inputStyle}
                     disabled={isSchoolDay}
@@ -508,63 +582,95 @@ function App() {
                         {hour > 12 ? hour - 12 : hour}:00 {hour < 12 ? 'AM' : 'PM'}
                       </option>
                     ))}
-                  </select>
-                </div>
-              </div>
+                      </select>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Break Time Settings */}
             <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '24px' }}>
-              <h3 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Settings size={24} />
-                Fun Break Settings
+              <h3 
+                style={{ 
+                  fontSize: isMobile ? '1.25rem' : '1.5rem', 
+                  fontWeight: '600', 
+                  marginBottom: '16px', 
+                  color: '#1e293b', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px',
+                  cursor: isMobile ? 'pointer' : 'default'
+                }}
+                onClick={() => isMobile && setShowBreakSettings(!showBreakSettings)}
+              >
+                <Settings size={isMobile ? 20 : 24} />
+                {isMobile ? 'Breaks' : 'Fun Break Settings'}
+                {isMobile && (
+                  <span style={{ marginLeft: 'auto', fontSize: '1rem' }}>
+                    {showBreakSettings ? '▼' : '▶'}
+                  </span>
+                )}
               </h3>
               
-              <div style={{ display: 'grid', gap: '16px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.125rem', fontWeight: '500' }}>
-                  <input
-                    type="checkbox"
-                    checked={includeBreaks}
-                    onChange={(e) => {
-                      setIncludeBreaks(e.target.checked);
-                      setTimeout(handleSettingsChange, 0);
-                    }}
-                    style={{ width: '20px', height: '20px', accentColor: '#3b82f6' }}
-                  />
-                  I want fun breaks!
-                </label>
+              {showBreakSettings && (
+                <div style={{ display: 'grid', gap: '16px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: isMobile ? '1rem' : '1.125rem', fontWeight: '500' }}>
+                    <input
+                      type="checkbox"
+                      checked={includeBreaks}
+                      onChange={(e) => {
+                        setIncludeBreaks(e.target.checked);
+                        // Immediately recalculate schedule
+                        const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
+                        if (currentTasksWithoutBreaks.length > 0) {
+                          setTasks(recalculateSchedule(currentTasksWithoutBreaks));
+                        }
+                      }}
+                      style={{ width: '20px', height: '20px', accentColor: '#3b82f6' }}
+                    />
+                    {isMobile ? 'Want breaks?' : 'I want fun breaks!'}
+                  </label>
 
                 {includeBreaks && (
                   <>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '1rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
-                        Activities before each break
-                      </label>
+                      <div>
+                        <label style={{ display: 'block', fontSize: isMobile ? '0.875rem' : '1rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
+                          {isMobile ? 'Activities per break' : 'Activities before each break'}
+                        </label>
                       <select
                         value={tasksPerBreak}
                         onChange={(e) => {
                           setTasksPerBreak(Number(e.target.value));
-                          setTimeout(handleSettingsChange, 0);
+                          // Immediately recalculate schedule
+                          const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
+                          if (currentTasksWithoutBreaks.length > 0) {
+                            setTasks(recalculateSchedule(currentTasksWithoutBreaks));
+                          }
                         }}
                         style={inputStyle}
                       >
-                        <option value={1}>1 activity</option>
-                        <option value={2}>2 activities</option>
-                        <option value={3}>3 activities</option>
-                        <option value={4}>4 activities</option>
-                        <option value={5}>5 activities</option>
+                        <option value={1}>After every 1 activity</option>
+                        <option value={2}>After every 2 activities</option>
+                        <option value={3}>After every 3 activities</option>
+                        <option value={4}>After every 4 activities</option>
+                        <option value={5}>After every 5 activities</option>
                       </select>
                     </div>
 
-                    <div>
-                      <label style={{ display: 'block', fontSize: '1rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
-                        How long should breaks be?
-                      </label>
+                      <div>
+                        <label style={{ display: 'block', fontSize: isMobile ? '0.875rem' : '1rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
+                          {isMobile ? 'Break length' : 'How long should breaks be?'}
+                        </label>
                       <select
                         value={breakDuration}
                         onChange={(e) => {
                           setBreakDuration(Number(e.target.value));
-                          setTimeout(handleSettingsChange, 0);
+                          // Immediately recalculate schedule
+                          const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
+                          if (currentTasksWithoutBreaks.length > 0) {
+                            setTasks(recalculateSchedule(currentTasksWithoutBreaks));
+                          }
                         }}
                         style={inputStyle}
                       >
@@ -576,15 +682,19 @@ function App() {
                       </select>
                     </div>
 
-                    <div>
-                      <label style={{ display: 'block', fontSize: '1rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
-                        How long for each activity?
-                      </label>
+                      <div>
+                        <label style={{ display: 'block', fontSize: isMobile ? '0.875rem' : '1rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
+                          {isMobile ? 'Activity length' : 'How long for each activity?'}
+                        </label>
                       <select
                         value={taskDuration}
                         onChange={(e) => {
                           setTaskDuration(Number(e.target.value));
-                          setTimeout(handleSettingsChange, 0);
+                          // Immediately recalculate schedule
+                          const currentTasksWithoutBreaks = tasks.filter((task) => task.priority !== 'break');
+                          if (currentTasksWithoutBreaks.length > 0) {
+                            setTasks(recalculateSchedule(currentTasksWithoutBreaks));
+                          }
                         }}
                         style={inputStyle}
                       >
@@ -599,30 +709,37 @@ function App() {
                   </>
                 )}
 
-                <div style={{ 
-                  background: '#dbeafe', 
-                  padding: '12px', 
-                  borderRadius: '8px', 
-                  fontSize: '0.875rem', 
-                  color: '#1e40af',
-                  border: '1px solid #93c5fd'
-                }}>
-                  🎉 <strong>Fun fact:</strong> You'll get a break after every {tasksPerBreak} activit{tasksPerBreak > 1 ? 'ies' : 'y'} to recharge!
+                  <div style={{ 
+                    background: '#dbeafe', 
+                    padding: isMobile ? '8px' : '12px', 
+                    borderRadius: '8px', 
+                    fontSize: isMobile ? '0.75rem' : '0.875rem', 
+                    color: '#1e40af',
+                    border: '1px solid #93c5fd'
+                  }}>
+                    {isMobile ? (
+                      `🎉 Break after ${tasksPerBreak} activit${tasksPerBreak > 1 ? 'ies' : 'y'}!`
+                    ) : (
+                      `🎉 Cool! You'll get a fun break after every ${tasksPerBreak} activit${tasksPerBreak > 1 ? 'ies' : 'y'} to recharge and have fun!`
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
           {/* Right Column - Timetable */}
           <div style={columnStyle} className="bg-slate-50 p-6 rounded-lg">
-            <h2 style={{ fontSize: '1.875rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }} className="text-3xl font-semibold mb-4">
-              📅 My Awesome Day Plan
+            <h2 style={{ fontSize: isMobile ? '1.5rem' : '1.875rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }} className="text-3xl font-semibold mb-4">
+              {isMobile ? '📅 My Schedule' : '📅 My Super Cool Schedule'}
             </h2>
             
             {tasks.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
                 <div style={{ fontSize: '4rem', marginBottom: '16px' }}>🎯</div>
-                <p style={{ fontSize: '1.125rem' }}>Ready to plan something awesome? Add your first activity!</p>
+                <p style={{ fontSize: isMobile ? '1rem' : '1.125rem' }}>
+                  {isMobile ? 'Add your first activity!' : 'Ready to make today amazing? Add your first cool activity!'}
+                </p>
               </div>
             ) : (
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -645,54 +762,86 @@ function App() {
           </div>
         </div>
 
-        {/* Inline Edit Dialog */}
-        {editDialogOpen && selectedTask && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 50
-          }} className="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center z-50">
+        {/* Bubble Edit Dialog */}
+        {editDialogOpen && selectedTask && bubbleEditPosition && (
+          <>
+            {/* Backdrop */}
+            <div 
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'transparent',
+                zIndex: 40
+              }}
+              onClick={handleCloseEditDialog}
+            />
+            
+            {/* Bubble Dialog */}
             <div style={{
+              position: 'fixed',
+              left: `${bubbleEditPosition.x}px`,
+              top: `${bubbleEditPosition.y}px`,
+              transform: 'translateX(-50%)',
               background: 'white',
-              padding: '24px',
-              borderRadius: '12px',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
-              width: '100%',
-              maxWidth: '400px'
-            }} className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-              <h3 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '16px' }} className="text-2xl font-semibold mb-4">
-                ✏️ Edit My Activity
+              padding: '20px',
+              borderRadius: '16px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              width: '320px',
+              zIndex: 50,
+              border: '2px solid #e2e8f0',
+              animation: 'bubbleIn 0.2s ease-out'
+            }}>
+              {/* Arrow pointing up */}
+              <div style={{
+                position: 'absolute',
+                top: '-8px',
+                left: '50%',
+                width: '16px',
+                height: '16px',
+                background: 'white',
+                border: '2px solid #e2e8f0',
+                borderBottom: 'none',
+                borderRight: 'none',
+                transform: 'translateX(-50%) rotate(45deg)'
+              }} />
+              
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }}>
+                ✏️ Edit Activity
               </h3>
               
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '1.125rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#64748b', marginBottom: '4px' }}>
                   Activity Name
                 </label>
                 <input
                   type="text"
                   value={editTaskText}
                   onChange={(e) => setEditTaskText(e.target.value)}
-                  style={inputStyle}
+                  style={{
+                    ...inputStyle,
+                    fontSize: '14px',
+                    padding: '8px 12px'
+                  }}
                   placeholder="What will you do?"
+                  autoFocus
                 />
               </div>
 
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '1.125rem', fontWeight: '500', color: '#334155', marginBottom: '8px' }}>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#64748b', marginBottom: '4px' }}>
                   How Important?
                 </label>
                 <select
                   value={selectedTaskPriority}
                   onChange={(e) => setSelectedTaskPriority(e.target.value as 'high' | 'medium' | 'low')}
-                  style={inputStyle}
-                  className="p-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-500 transition-all duration-300 w-full"
+                  style={{
+                    ...inputStyle,
+                    fontSize: '14px',
+                    padding: '8px 12px'
+                  }}
                 >
                   <option value="high">🔴 Super Important</option>
                   <option value="medium">🟡 Pretty Important</option>
@@ -700,32 +849,40 @@ function App() {
                 </select>
               </div>
               
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                 <button
                   onClick={handleCloseEditDialog}
                   style={{
-                    background: '#e2e8f0',
-                    color: '#334155',
-                    padding: '12px 24px',
-                    borderRadius: '8px',
-                    fontWeight: 'bold',
+                    background: '#f1f5f9',
+                    color: '#64748b',
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: '500',
                     border: 'none',
                     cursor: 'pointer'
                   }}
-                  className="bg-gray-300 text-slate-700 p-3 rounded-lg font-bold text-lg hover:bg-gray-400 transition-all duration-300"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleUpdateTask}
-                  style={buttonStyle}
-                  className="bg-blue-500 text-white p-3 rounded-lg font-bold text-lg hover:bg-blue-600 transition-all duration-300"
+                  style={{
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                    color: 'white',
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
                 >
-                  Save Changes
+                  Save
                 </button>
               </div>
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>

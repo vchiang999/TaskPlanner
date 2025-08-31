@@ -6,13 +6,15 @@ import { Task } from './App';
 
 interface SortableTaskItemProps {
   task: Task;
-  handleOpenEditDialog: (task: Task) => void;
+  handleOpenEditDialog: (task: Task, event?: React.MouseEvent) => void;
   handleTaskComplete: (taskId: number) => void;
   handleDeleteTask: (taskId: number) => void;
   index: number;
 }
 
 export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplete, handleDeleteTask, index }: SortableTaskItemProps) {
+  const isMobile = window.innerWidth < 768;
+  
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ 
     id: task.id, 
     disabled: task.priority === 'break' 
@@ -27,7 +29,7 @@ export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplet
     e.preventDefault();
     e.stopPropagation();
     if (task.priority !== 'break') {
-      handleOpenEditDialog(task);
+      handleOpenEditDialog(task, e);
     }
   };
 
@@ -85,12 +87,12 @@ export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplet
     }
   };
 
-  // Function to get priority emoji dot
+  // Function to get priority emoji dot - fixed color matching
   const getPriorityEmoji = (priority: 'high' | 'medium' | 'low'): string => {
     switch (priority) {
-      case 'high': return '🔴';
-      case 'medium': return '🟡';
-      case 'low': return '🟢';
+      case 'high': return '🔴'; // Red dot for high priority (matches red background)
+      case 'medium': return '🟡'; // Yellow dot for medium priority (matches yellow background)  
+      case 'low': return '🟢'; // Green dot for low priority (matches green background)
       default: return '⭐';
     }
   };
@@ -109,7 +111,7 @@ export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplet
   
   const cardStyle = {
     ...priorityStyles,
-    padding: '16px',
+    padding: isMobile ? '12px' : '16px',
     borderRadius: '12px',
     boxShadow: task.completed 
       ? '0 2px 4px -1px rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.03)' 
@@ -117,7 +119,7 @@ export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplet
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: '12px',
+    marginBottom: isMobile ? '8px' : '12px',
     cursor: task.priority === 'break' ? 'default' : 'grab',
     transition: 'all 0.3s ease',
     transform: isVisible ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.95)',
@@ -128,13 +130,16 @@ export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplet
   const leftSectionStyle = {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px'
+    gap: isMobile ? '8px' : '12px',
+    flex: 1,
+    minWidth: 0
   };
 
   const rightSectionStyle = {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px'
+    gap: isMobile ? '8px' : '12px',
+    flexShrink: 0
   };
 
   const timeStyle = {
@@ -144,7 +149,7 @@ export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplet
   };
 
   const editButtonStyle = {
-    padding: '6px',
+    padding: isMobile ? '10px' : '6px',
     borderRadius: '50%',
     background: 'rgba(255, 255, 255, 0.8)',
     border: 'none',
@@ -152,7 +157,9 @@ export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplet
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    transition: 'all 0.2s ease'
+    transition: 'all 0.2s ease',
+    minWidth: isMobile ? '44px' : 'auto',
+    minHeight: isMobile ? '44px' : 'auto'
   };
 
   // Separate drag listeners from the edit button area
@@ -229,20 +236,30 @@ export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplet
             </span>
           )}
           <p style={{ 
-            fontSize: '1.125rem', 
+            fontSize: isMobile ? '1rem' : '1.125rem', 
             fontWeight: '600', 
             margin: 0,
             textShadow: '1px 1px 2px rgba(0,0,0,0.1)',
             textDecoration: task.completed ? 'line-through' : 'none',
             opacity: task.completed ? 0.6 : 1,
-            transition: 'all 0.3s ease'
+            transition: 'all 0.3s ease',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: isMobile ? 'nowrap' : 'normal'
           }}>
             {task.text}
           </p>
         </div>
         <div style={rightSectionStyle}>
-          <span style={timeStyle}>
-            {task.startTime} - {task.endTime}
+          <span style={{
+            ...timeStyle,
+            fontSize: isMobile ? '12px' : '14px',
+            whiteSpace: 'nowrap'
+          }}>
+            {isMobile ? 
+              `${task.startTime.split(' ')[0]}-${task.endTime.split(' ')[0]}` : 
+              `${task.startTime} - ${task.endTime}`
+            }
           </span>
           {task.priority !== 'break' && (
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -263,7 +280,7 @@ export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplet
                 }}
                 title="Edit activity"
               >
-                <Edit size={18} style={{ color: priorityStyles.color }} />
+                <Edit size={isMobile ? 20 : 18} style={{ color: priorityStyles.color }} />
               </button>
               
               <button 
@@ -284,7 +301,7 @@ export function SortableTaskItem({ task, handleOpenEditDialog, handleTaskComplet
                 }}
                 title="Delete activity"
               >
-                <Trash2 size={18} style={{ color: '#ef4444' }} />
+                <Trash2 size={isMobile ? 20 : 18} style={{ color: '#ef4444' }} />
               </button>
             </div>
           )}

@@ -69,3 +69,39 @@ button:hover {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Bubble animation */
+@keyframes bubbleIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.8) translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1) translateY(0);
+  }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+  
+  /* Ensure touch targets are at least 44px */
+  button, input[type="checkbox"], select {
+    min-height: 44px;
+  }
+  
+  /* Better spacing on mobile */
+  .mobile-spacing {
+    padding: 8px !important;
+    margin: 4px 0 !important;
+  }
+  
+  /* Prevent horizontal scroll */
+  * {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+}
