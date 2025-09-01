@@ -16,10 +16,10 @@ export interface Task {
   breakEmoji?: string; // Fixed emoji for break times
 }
 
-// Helper function to format time consistently
+// Helper function to format time consistently in HH:MM AM/PM format
 const formatTime = (date: Date) => {
   return date.toLocaleTimeString('en-US', { 
-    hour: 'numeric', 
+    hour: '2-digit', 
     minute: '2-digit', 
     hour12: true 
   });
@@ -375,11 +375,15 @@ function App() {
   const containerStyle = {
     minHeight: window.innerWidth < 768 ? '100dvh' : '100vh', // Dynamic viewport height for mobile
     background: 'linear-gradient(135deg, #e0f2fe 0%, #b3e5fc 100%)',
+    backgroundAttachment: 'fixed',
+    backgroundSize: '100% 100%',
     fontFamily: "'Poppins', 'Comic Sans MS', cursive, sans-serif",
     color: '#334155',
     padding: window.innerWidth < 768 ? '8px' : '16px',
     paddingTop: window.innerWidth < 768 ? 'max(8px, env(safe-area-inset-top))' : '16px',
-    paddingBottom: window.innerWidth < 768 ? 'max(8px, env(safe-area-inset-bottom))' : '16px'
+    paddingBottom: window.innerWidth < 768 ? 'max(8px, env(safe-area-inset-bottom))' : '16px',
+    paddingLeft: window.innerWidth < 768 ? 'max(8px, env(safe-area-inset-left))' : '16px',
+    paddingRight: window.innerWidth < 768 ? 'max(8px, env(safe-area-inset-right))' : '16px'
   };
 
   const mainCardStyle = {
@@ -544,7 +548,7 @@ function App() {
         {taskAddedBubbles.map((bubble, index) => (
           <div key={bubble.id} style={{
             position: 'fixed',
-            top: `${20 + (index * 60)}px`, // Stack bubbles vertically
+            top: `${Math.max(20, window.innerHeight * 0.1) + (index * 60)}px`, // Position relative to viewport, not page
             right: '20px',
             background: '#10b981',
             color: 'white',
@@ -647,7 +651,7 @@ function App() {
                 {isMobile ? 'Schedule' : 'My Day Schedule'}
                 {isMobile && (
                   <span style={{ marginLeft: 'auto', fontSize: '1rem' }}>
-                    {showScheduleSettings ? '🔽' : '▶️'}
+                    {showScheduleSettings ? '➖' : '➕'}
                   </span>
                 )}
               </h3>
@@ -675,12 +679,12 @@ function App() {
                     marginBottom: '16px'
                   }}>
                     {isMobile ? (
-                      <>📚 School: 3:00 PM - 7:00 PM<br />🏠 Free: 9:00 AM - 7:00 PM</>
+                      <>📚 School: 03:00 PM - 07:00 PM<br />🏠 Free: 09:00 AM - 07:00 PM</>
                     ) : (
                       <>
-                        📚 <strong>School day:</strong> Plan activities from 3:00 PM to 7:00 PM (after school!)
+                        📚 <strong>School day:</strong> Plan activities from 03:00 PM to 07:00 PM (after school!)
                         <br />
-                        🏠 <strong>Free day:</strong> Plan activities from 9:00 AM to 7:00 PM (whole day fun!)
+                        🏠 <strong>Free day:</strong> Plan activities from 09:00 AM to 07:00 PM (whole day fun!)
                       </>
                     )}
                   </div>
@@ -694,11 +698,10 @@ function App() {
                     value={startHour}
                     onChange={(e) => setStartHour(Number(e.target.value))}
                     style={inputStyle}
-                    disabled={isSchoolDay}
                   >
                     {Array.from({ length: 12 }, (_, i) => i + 6).map(hour => (
                       <option key={hour} value={hour}>
-                        {hour}:00 {hour < 12 ? 'AM' : 'PM'}
+                        {hour === 12 ? '12:00 PM' : hour > 12 ? `${String(hour - 12).padStart(2, '0')}:00 PM` : `${String(hour).padStart(2, '0')}:00 AM`}
                       </option>
                     ))}
                   </select>
@@ -712,11 +715,10 @@ function App() {
                     value={endHour}
                     onChange={(e) => setEndHour(Number(e.target.value))}
                     style={inputStyle}
-                    disabled={isSchoolDay}
                   >
                     {Array.from({ length: 12 }, (_, i) => i + 12).map(hour => (
                       <option key={hour} value={hour}>
-                        {hour > 12 ? hour - 12 : hour}:00 {hour < 12 ? 'AM' : 'PM'}
+                        {hour === 12 ? '12:00 PM' : hour > 12 ? `${String(hour - 12).padStart(2, '0')}:00 PM` : `${String(hour).padStart(2, '0')}:00 AM`}
                       </option>
                     ))}
                       </select>
@@ -745,7 +747,7 @@ function App() {
                 {isMobile ? 'Breaks' : 'Fun Break Settings'}
                 {isMobile && (
                   <span style={{ marginLeft: 'auto', fontSize: '1rem' }}>
-                    {showBreakSettings ? '🔽' : '▶️'}
+                    {showBreakSettings ? '➖' : '➕'}
                   </span>
                 )}
               </h3>
@@ -855,6 +857,12 @@ function App() {
                     placeholder="What will you do? 🤔"
                     value={newTaskText}
                     onChange={(e) => setNewTaskText(e.target.value)}
+                    onFocus={(e) => {
+                      // Prevent iOS zoom and scrolling
+                      if (isMobile) {
+                        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
+                    }}
                     style={{
                       ...inputStyle,
                       fontSize: '16px',
@@ -1095,6 +1103,14 @@ function App() {
             <span>⏰ Manage Time</span>
             <span>🎯 Reach Goals</span>
           </div>
+          <p style={{ 
+            margin: '12px 0 0 0', 
+            fontSize: isMobile ? '0.625rem' : '0.75rem',
+            color: '#94a3b8',
+            fontStyle: 'italic'
+          }}>
+            💡 Idea from Kyle and Kai-Wei, made awesome by Victor! 🌟
+          </p>
         </footer>
       </div>
     </div>
