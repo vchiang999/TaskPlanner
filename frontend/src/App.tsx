@@ -71,7 +71,6 @@ function App() {
   const [showBreakSettings, setShowBreakSettings] = useState(!isMobile);
   const [currentView, setCurrentView] = useState<'tasks' | 'settings'>('tasks'); // Mobile tab state
   const [taskAddedBubbles, setTaskAddedBubbles] = useState<{id: number, text: string}[]>([]); // Task added confirmations
-  const [userHasManuallyReordered, setUserHasManuallyReordered] = useState(false); // Track manual reordering
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -369,8 +368,6 @@ function App() {
     if (oldIndex !== newIndex) {
       const reorderedTasks = arrayMove(actualTasks, oldIndex, newIndex);
       setTasks(recalculateSchedule(reorderedTasks));
-      // Mark that user has manually reordered tasks
-      setUserHasManuallyReordered(true);
     }
   };
 
